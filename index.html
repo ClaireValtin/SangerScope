@@ -1,0 +1,1724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SangerScope</title>
+<meta name="description" content="Browser-based Sanger analysis: MANE reference loading, AB1/FASTA alignment, variant calling, ClinVar / gnomAD / VariantValidator annotation and Excel export.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eceff0;--panel:#ffffff;--panel2:#f5f7f8;--ink:#14181b;--muted:#67727a;--line:#dce1e4;
+  --head:#0f1214;--head-ink:#f2f4f5;
+  --accent:#0f9f9e;--accent-ink:#ffffff;--accent-soft:#d6f1f0;
+  --green:#1e9c5a;--green-soft:#dcf3e6;--orange:#e07f14;--orange-soft:#fcead4;
+  --red:#d03c3c;--red-soft:#fadcdc;--yellow:#b98b00;--yellow-soft:#fbf0cc;
+  --bA:#1e9c5a;--bC:#2a6fdb;--bG:#1d1f21;--bT:#d03c3c;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:'Manrope',system-ui,-apple-system,Segoe UI,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0c0f11;--panel:#151a1d;--panel2:#1b2024;--ink:#e5e9eb;--muted:#8d979e;--line:#283035;
+  --head:#07090a;--accent:#2cc2bf;--accent-ink:#04110f;--accent-soft:#11302f;
+  --green:#3cc47c;--green-soft:#123122;--orange:#f39a3a;--orange-soft:#38270f;
+  --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;--bG:#d6d9db;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+header.top{background:var(--head);color:var(--head-ink);padding:12px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.2px}
+.brand small{font-weight:500;font-size:12px;color:#97a2a8;letter-spacing:0}
+header .sp{flex:1}
+.hbtn{background:#1f2629;border:1px solid #2d363a;color:#e8ecee;border-radius:8px;padding:7px 12px;cursor:pointer}
+.hbtn:hover{border-color:var(--accent)}
+main{max-width:1440px;margin:0 auto;padding:18px 16px 60px;display:grid;gap:16px}
+.grid2{display:grid;gap:16px;grid-template-columns:1fr}
+@media (min-width:1100px){.grid2{grid-template-columns:1fr 1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card h2{margin:0 0 12px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px}
+.card h2 .n{background:var(--accent);color:var(--accent-ink);border-radius:6px;width:22px;height:22px;display:inline-grid;place-items:center;font-size:12px}
+.card h2 .rt{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);font-size:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.inp{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.inp:focus{outline:2px solid var(--accent);outline-offset:-1px}
+textarea.inp{width:100%;font-family:var(--mono);font-size:12px;resize:vertical}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:600}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn.dark{background:var(--ink);color:var(--panel)}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.mono{font-family:var(--mono)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-top:12px;font-size:13px}
+.kv b{color:var(--muted);font-weight:600}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.bdg{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.bdg.ok{background:var(--green-soft);color:var(--green);border-color:transparent}
+.bdg.bad{background:var(--red-soft);color:var(--red);border-color:transparent}
+.bdg.warn{background:var(--orange-soft);color:var(--orange);border-color:transparent}
+.bdg.info{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:.15s;background:var(--panel2)}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{display:block;font-size:15px}
+details summary{cursor:pointer;font-weight:700;font-size:13px;margin:12px 0 6px}
+.reads{display:grid;gap:6px;margin-top:12px}
+.rd{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--panel2)}
+.rd.off{opacity:.5}
+.rd .dir{font-family:var(--mono);font-weight:700;font-size:12px;border-radius:6px;padding:3px 7px;min-width:44px;text-align:center}
+.dirF{background:var(--accent-soft);color:var(--accent)}
+.dirR{background:var(--orange-soft);color:var(--orange)}
+.dirX{background:var(--red-soft);color:var(--red)}
+.rd .nm{font-weight:700;word-break:break-all}
+.rd .meta{font-size:12px;color:var(--muted)}
+.rd .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+table{border-collapse:collapse;width:100%}
+.tbl{overflow-x:auto}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:700;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}
+.tbl tr.vr{cursor:pointer}
+.tbl tr.vr:hover td{background:var(--panel2)}
+.tbl tr.sel td{background:var(--accent-soft)}
+.hg{font-family:var(--mono);font-weight:700;white-space:nowrap}
+.chip{display:inline-block;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:700;white-space:nowrap}
+.c-P{background:var(--red-soft);color:var(--red)}
+.c-LP{background:var(--orange-soft);color:var(--orange)}
+.c-VUS{background:var(--yellow-soft);color:var(--yellow)}
+.c-LB{background:var(--green-soft);color:var(--green)}
+.c-B{background:var(--green-soft);color:var(--green)}
+.c-N{background:var(--panel2);color:var(--muted)}
+.flagl{display:flex;flex-wrap:wrap;gap:4px}
+.fl{font-size:11px;border-radius:5px;padding:1px 6px;background:var(--orange-soft);color:var(--orange);font-weight:700;white-space:nowrap}
+.fl.r{background:var(--red-soft);color:var(--red)}
+.fl.g{background:var(--panel2);color:var(--muted)}
+select.cls{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line)}
+input.note{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);width:150px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 12px}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:120px}
+.stat .v{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.stat .l{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.ex{font-size:11px;font-weight:700;border-radius:6px;padding:3px 7px;font-family:var(--mono);cursor:pointer;border:1px solid transparent}
+.ex.full{background:var(--green-soft);color:var(--green)}
+.ex.part{background:var(--orange-soft);color:var(--orange)}
+.ex.none{background:var(--red-soft);color:var(--red)}
+.ex:hover{border-color:currentColor}
+.svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+#covSvg{display:block;min-width:900px;width:100%}
+#covSvg text{font-family:var(--sans);font-size:10px;fill:var(--muted)}
+#covSvg .exn{font-weight:700;fill:var(--ink)}
+.gaps{font-size:12px;margin-top:8px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.toolbar label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.status{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:30px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#aln{max-height:72vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px 0;background:var(--panel)}
+.blk{padding:4px 0 10px;border-bottom:1px dashed var(--line)}
+.blk:last-child{border-bottom:0}
+.ln{display:flex;white-space:pre;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+.ln .lab{width:118px;flex:none;padding:0 8px 0 12px;color:var(--muted);user-select:none;-webkit-user-select:none;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+.ln .sq{cursor:crosshair}
+.ln .end{color:var(--muted);user-select:none;-webkit-user-select:none;padding-left:10px;font-size:11px}
+.ln.ru .sq,.ln.aa .sq{color:var(--muted)}
+.ln.aa .sq{color:var(--accent);font-weight:700}
+.ln.ref .lab{color:var(--ink);font-weight:700}
+.rgap{padding:6px 12px;color:var(--muted);font-size:12px;font-style:italic;user-select:none}
+.k-cds{color:var(--ink);font-weight:700}
+.k-utr{color:var(--accent)}
+.k-in{color:var(--muted)}
+.k-pr{background:var(--orange-soft)}
+.k-v{background:var(--yellow-soft);outline:1px solid var(--yellow)}
+.k-cur{background:var(--accent)!important;color:var(--accent-ink)!important}
+.s-mm{background:var(--red);color:#fff;font-weight:700}
+.s-het{background:var(--orange);color:#fff;font-weight:700}
+.s-gap{color:var(--red);font-weight:700}
+.s-ins{box-shadow:inset 2px 0 0 var(--red)}
+.s-n{color:var(--muted)}
+.s-mix{background:var(--orange-soft)}
+.s-lowq{text-decoration:underline dotted var(--muted)}
+.tracepanel{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--panel2);display:none}
+.tracepanel.on{display:block}
+.tracepanel .tr{margin:6px 0 10px}
+.tracepanel .tr .h{font-size:12px;font-weight:700;display:flex;gap:10px;flex-wrap:wrap}
+.tracepanel canvas{width:100%;height:150px;display:block;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-top:4px}
+.tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:5px 11px;cursor:pointer;font-weight:700;font-size:12px}
+.tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.seqbox{font-family:var(--mono);font-size:12px;line-height:1.55;word-break:break-all;max-height:320px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}
+.seqbox .ex{all:unset;color:var(--accent);font-weight:700}
+.seqbox .in{color:var(--muted)}
+.seqbox .alt{color:var(--ink);font-weight:700}
+.flagsbox{display:grid;gap:5px;margin-top:10px}
+.fb{font-size:12.5px;border-left:3px solid var(--orange);padding:5px 10px;background:var(--orange-soft);border-radius:0 7px 7px 0}
+.fb.r{border-color:var(--red);background:var(--red-soft)}
+.fb.i{border-color:var(--accent);background:var(--accent-soft)}
+.empty{color:var(--muted);font-size:13px;padding:14px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:9px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}
+#toast.on{opacity:1}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:20px;width:min(520px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 12px}
+.set{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;font-size:13px}
+.set small{display:block;color:var(--muted);font-size:11.5px}
+footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
+.pt td{font-size:12.5px}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.annot{font-size:12px}
+.annot a{font-weight:700}
+.vvn{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.sc{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;margin:2px 3px 0 0;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.sc-hi{background:var(--red-soft);color:var(--red);border-color:transparent}
+.sc-mid{background:var(--yellow-soft);color:var(--yellow);border-color:transparent}
+.sc-lo{background:var(--green-soft);color:var(--green);border-color:transparent}
+.scs{margin-top:2px;max-width:220px}
+.mdd summary{font-size:11px;margin:4px 0 0;color:var(--accent)}
+.mdd table{font-size:11px;margin-top:4px;min-width:230px}
+.mdd th{text-align:left;padding:4px 4px 1px;font-size:10px;text-transform:uppercase;color:var(--muted);border:0}
+.mdd td{padding:1px 4px;border:0;font-size:11px}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="7" fill="#0f9f9e"/><path d="M3 18 Q6 4 9 18 T15 18 Q18 8 21 18 T25 16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    <div>SangerScope<br><small>Sanger variant analysis · runs entirely in your browser</small></div>
+  </div>
+  <div class="sp"></div>
+  <button class="hbtn" id="setBtn">Settings</button>
+</header>
+
+<main>
+  <div class="grid2">
+    <section class="card">
+      <h2><span class="n">1</span>Gene &amp; reference<span class="rt" id="geneState"></span></h2>
+      <div class="row">
+        <input id="geneInput" class="inp" placeholder="Gene symbol, e.g. VHL" style="flex:1;min-width:140px;text-transform:uppercase" autocomplete="off" spellcheck="false">
+        <button class="btn" id="loadGene">Load gene</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="txSelect" class="inp" style="flex:1" disabled><option>Transcript</option></select>
+      </div>
+      <div id="geneInfo"></div>
+      <div id="gates" class="badges"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">2</span>Patient &amp; export</h2>
+      <div class="row">
+        <input id="patient" class="inp" placeholder="Patient name" style="flex:2;min-width:180px">
+        <input id="sample" class="inp" placeholder="Dossier / sample ID (optional)" style="flex:1;min-width:150px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn dark" id="exportBtn">Export Excel</button>
+        <button class="btn ghost" id="clearBtn">New patient (clear reads)</button>
+      </div>
+      <p class="hint">Reads, traces and the patient name never leave this browser. Only variant descriptions (e.g. <span class="mono">NM_000551.4:c.191G&gt;C</span>) and genomic coordinates are sent to VariantValidator, NCBI ClinVar, gnomAD and MobiDetails.</p>
+      <div id="sumBox" class="stats" style="margin:6px 0 0"></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2><span class="n">3</span>Reads<span class="rt" id="readCount"></span></h2>
+      <div class="drop" id="drop">
+        <strong>Drop AB1 / FASTA files here</strong>
+        <span class="muted small">or click to browse · .ab1 .abi .fasta .fa .fas .seq .txt · several at once</span>
+        <input type="file" id="fileInput" multiple hidden accept=".ab1,.abi,.ab,.fasta,.fa,.fas,.fna,.seq,.txt">
+      </div>
+      <details id="pasteDet">
+        <summary>Paste a sequence or FASTA</summary>
+        <input id="pasteName" class="inp" placeholder="Read name (used if no &gt;header), e.g. 2F" style="width:100%;margin-bottom:6px">
+        <textarea id="pasteBox" class="inp" rows="5" placeholder="&gt;1F&#10;ACGTRYKM... (IUPAC codes = heterozygous)"></textarea>
+        <div class="row" style="margin-top:6px"><button class="btn sm" id="pasteAdd">Add sequence</button><span class="muted small">Multi-FASTA allowed. R, Y, S, W, K, M are read as heterozygous.</span></div>
+      </details>
+      <div class="reads" id="readsList"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">4</span>Primers<span class="rt" id="primerState"></span></h2>
+      <textarea id="primerText" class="inp" rows="5" placeholder="One primer per line: name then sequence, e.g.&#10;EX1-F CGGGTGGAACCTTAGCGGA&#10;EX1-R GATAAGATTCCCACCTACTGGGC&#10;(F/R pairs are matched by name)"></textarea>
+      <div class="row" style="margin-top:6px"><button class="btn sm" id="primerBtn">Locate primers</button><span class="muted small">Saved in this browser for each gene.</span></div>
+      <div class="tbl" style="margin-top:10px"><table class="pt"><thead><tr><th>Amplicon</th><th>Size</th><th>Sequenced insert</th><th>Exons</th><th>Notes</th></tr></thead><tbody id="primerTable"></tbody></table></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2><span class="n">5</span>Coverage<span class="rt">click the map to jump the alignment there</span></h2>
+    <div class="stats" id="covStats"></div>
+    <div class="svgwrap"><svg id="covSvg" viewBox="0 0 1200 120" preserveAspectRatio="xMinYMin meet"></svg></div>
+    <div class="chips" id="exonChips"></div>
+    <div class="gaps" id="covGaps"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">6</span>Variants<span class="rt" id="varState"></span></h2>
+    <div class="tbl"><table id="varTable"><thead><tr><th>HGVS c.</th><th>Protein</th><th>Location / effect</th><th>Zyg.</th><th>Reads</th><th>ClinVar</th><th>gnomAD v4</th><th>MobiDetails</th><th>Flags</th><th>Your class</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+    <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
+    <div id="flags" class="flagsbox"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">7</span>Alignment<span class="rt">select &amp; copy works on the sequence lines · click an AB1 base to open its traces</span></h2>
+    <div class="toolbar">
+      <label>Show <select id="viewMode" class="inp"><option value="reads">Read-covered regions</option><option value="exons">Coding exons ± 30 bp</option><option value="all">Whole gene</option></select></label>
+      <label>Width <select id="blockW" class="inp"><option>60</option><option>80</option><option selected>100</option><option>120</option><option>150</option></select></label>
+      <label><input type="checkbox" id="dotsChk"> dots for matches</label>
+      <input id="jumpInput" class="inp" placeholder="Go to c. (e.g. 191 or 340+5)" style="width:200px">
+      <button class="btn sm ghost" id="jumpBtn">Go</button>
+    </div>
+    <div class="tracepanel" id="tracePanel"></div>
+    <div class="status" id="status">Hover the alignment for coordinates.</div>
+    <div id="aln"><div class="empty" style="margin:8px">The alignment appears here as soon as a gene and a read are loaded.</div></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">8</span>Reference sequences</h2>
+    <div class="tabs" id="refTabs"></div>
+    <div class="row" style="margin-bottom:8px"><button class="btn sm" id="refCopy">Copy</button><button class="btn sm ghost" id="refCopyFa">Copy as FASTA</button><span class="muted small" id="refNote"></span></div>
+    <div class="seqbox" id="refBox"><span class="muted">Load a gene to see its sequences.</span></div>
+    <details>
+      <summary>Extract a region by c. coordinates</summary>
+      <div class="row">
+        <input id="regFrom" class="inp mono" placeholder="from, e.g. 191-20">
+        <input id="regTo" class="inp mono" placeholder="to, e.g. 340+50">
+        <button class="btn sm" id="regBtn">Extract</button>
+        <button class="btn sm ghost" id="regCopy">Copy</button>
+      </div>
+      <div class="seqbox" id="regOut" style="margin-top:6px;max-height:160px"></div>
+    </details>
+  </section>
+</main>
+<footer>
+  References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more). Heterozygous calls are made from secondary-peak ratios and must be confirmed on the trace; heterozygous indels are flagged as mixed-trace regions, not called. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out). For laboratory use with expert review.
+</footer>
+
+<dialog id="settingsDlg">
+  <h3>Settings</h3>
+  <div class="set">
+    <div>Heterozygous secondary-peak ratio<small>Secondary peak height ÷ primary, AB1 only. Lower = more sensitive, more noise.</small></div>
+    <div class="row"><input type="range" id="sHet" min="0.12" max="0.6" step="0.01"><span id="sHetV" class="mono"></span></div>
+    <div>Quality trimming (Mott)<small>Trim noisy read ends from AB1 Phred scores.</small></div>
+    <div class="row"><input type="checkbox" id="sTrim"><input type="number" id="sTrimQ" class="inp" style="width:64px" min="5" max="40"> Q</div>
+    <div>Read-edge zone (bp)<small>Variants this close to an alignment end are flagged.</small></div>
+    <input type="number" id="sEdge" class="inp" style="width:70px" min="0" max="50">
+    <div>Annotate variants automatically<small>VariantValidator → ClinVar → gnomAD, queued to respect rate limits.</small></div>
+    <input type="checkbox" id="sAuto">
+    <div>NCBI API key (optional)<small>Raises the NCBI limit from 3 to 10 requests/s. Stored only in this browser.</small></div>
+    <input type="password" id="sKey" class="inp" style="width:180px" autocomplete="off">
+    <div>MobiDetails API key (optional)<small>Free MobiDetails account → profile page. Needed only to create variants MobiDetails doesn't have yet. Stored only in this browser.</small></div>
+    <input type="password" id="sMdKey" class="inp" style="width:180px" autocomplete="off">
+    <div>Annotation cache<small>Results are reused for 7 days. Clear to force fresh ClinVar / gnomAD / MobiDetails data.</small></div>
+    <button class="btn sm ghost" id="sClearCache" type="button">Clear cache</button>
+  </div>
+  <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="setClose">Done</button></div>
+</dialog>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   SangerScope — single-file Sanger analysis app (no server needed)
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms); }
+function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function recall(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+async function copyText(t, what = 'Copied') { try { await navigator.clipboard.writeText(t); toast(what); } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast(what); } }
+
+/* ---------------- sequence basics ---------------- */
+const IUPAC = {A:'A',C:'C',G:'G',T:'T',R:'AG',Y:'CT',S:'CG',W:'AT',K:'GT',M:'AC',B:'CGT',D:'AGT',H:'ACT',V:'ACG',N:'ACGT'};
+const SET2CODE = {}; for (const [k, v] of Object.entries(IUPAC)) SET2CODE[v] = k;
+const codeOf = bases => SET2CODE[[...new Set(bases)].sort().join('')] || 'N';
+const COMP = {A:'T',T:'A',C:'G',G:'C',R:'Y',Y:'R',S:'S',W:'W',K:'M',M:'K',B:'V',V:'B',D:'H',H:'D',N:'N','-':'-'};
+function revcomp(s) { let o = ''; for (let i = s.length - 1; i >= 0; i--) o += COMP[s[i]] || 'N'; return o; }
+const isAmb = b => IUPAC[b] && IUPAC[b].length > 1 && b !== 'N';
+const NT = new Int8Array(128).fill(-1); NT[65]=0;NT[67]=1;NT[71]=2;NT[84]=3;NT[97]=0;NT[99]=1;NT[103]=2;NT[116]=3;
+const CODON = {}; { const b = 'TCAG', a = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG'; let n = 0; for (const x of b) for (const y of b) for (const z of b) CODON[x+y+z] = a[n++]; }
+const AA3 = {A:'Ala',R:'Arg',N:'Asn',D:'Asp',C:'Cys',Q:'Gln',E:'Glu',G:'Gly',H:'His',I:'Ile',L:'Leu',K:'Lys',M:'Met',F:'Phe',P:'Pro',S:'Ser',T:'Thr',W:'Trp',Y:'Tyr',V:'Val','*':'Ter','X':'Xaa'};
+const tr1 = c => CODON[c] || 'X';
+function translate(s) { let p = ''; for (let i = 0; i + 2 < s.length; i += 3) p += tr1(s.slice(i, i + 3)); return p; }
+
+/* ---------------- settings & state ---------------- */
+const DEF = {het: 0.30, trim: true, trimQ: 20, edge: 10, auto: true, ncbiKey: '', mdKey: '', width: 100, dots: false, view: 'reads'};
+const ST = Object.assign({}, DEF, recall('ssv-settings') || {});
+const saveSettings = () => store('ssv-settings', ST);
+
+let R = null;          // loaded reference
+let PROD = null;       // NCBI product report for the gene
+let IDX = null;        // k-mer index of the reference
+const READS = []; let readSeq = 0;
+let AMPS = [];         // located amplicons
+let VARS = [];         // merged variants
+const ANN = new Map(); // annotation per variant key
+const UCLS = new Map();// user class & note per key
+let SEL = null;        // selected variant key
+let CUR = -1;          // highlighted ref index in alignment
+
+/* ---------------- network (rate-limited queues) ---------------- */
+const EU = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+const DS = 'https://api.ncbi.nlm.nih.gov/datasets/v2';
+const queues = {};
+function serial(name, gap, fn) {
+  const q = queues[name] || (queues[name] = {chain: Promise.resolve(), last: 0});
+  const run = async () => { const w = q.last + gap - Date.now(); if (w > 0) await sleep(w); q.last = Date.now(); return fn(); };
+  const p = q.chain.then(run, run); q.chain = p.catch(() => {}); return p;
+}
+async function fetchRetry(url, opt = {}, type = 'json', tries = 4) {
+  let err;
+  for (let a = 0; a < tries; a++) {
+    try {
+      const r = await fetch(url, opt);
+      if (r.status === 429 || r.status === 503) { err = new Error(`HTTP ${r.status} (rate limited)`); await sleep(1500 * (a + 1)); continue; }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return type === 'json' ? await r.json() : await r.text();
+    } catch (e) { err = e; if (/HTTP 4\d\d/.test(e.message) && !/429/.test(e.message)) break; await sleep(1200 * (a + 1)); }  // NCBI 429s arrive without CORS headers → TypeError: retry with backoff
+  }
+  throw err;
+}
+function ncbi(url, type = 'json') {
+  return serial('ncbi', ST.ncbiKey ? 130 : 400, () => {
+    let u = url;
+    if (ST.ncbiKey && u.startsWith(EU)) u += (u.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(ST.ncbiKey);
+    const opt = (ST.ncbiKey && u.startsWith(DS)) ? {headers: {'api-key': ST.ncbiKey}} : {};
+    return fetchRetry(u, opt, type);
+  });
+}
+
+/* =====================================================================
+   1. Reference loading (MANE Select via NCBI Datasets + E-utilities)
+   ===================================================================== */
+const FLANK = 250;
+async function loadGene(symbol) {
+  symbol = symbol.trim().toUpperCase();
+  if (!symbol) return;
+  setGeneState(`<span class="spin"></span> looking up ${esc(symbol)}…`);
+  try {
+    const pk = `ssv-prod-${symbol}`, pc = recall(pk);
+    let d;
+    if (pc && Date.now() - pc.t < 30 * 864e5) d = pc.d;
+    else { d = await ncbi(`${DS}/gene/symbol/${encodeURIComponent(symbol)}/taxon/human/product_report`); if ((d.reports || []).length) store(pk, {t: Date.now(), d}); }
+    const rep = (d.reports || []).find(r => (r.product?.symbol || '').toUpperCase() === symbol) || (d.reports || [])[0];
+    if (!rep) throw new Error(`No human gene called "${symbol}" in NCBI Gene.`);
+    PROD = rep.product;
+    const txs = (PROD.transcripts || []).filter(t => t.cds && /^NM_/.test(t.accession_version || '') && (t.genomic_locations || []).length);
+    if (!txs.length) throw new Error(`${symbol}: no protein-coding RefSeq transcript found.`);
+    const rank = t => t.select_category === 'MANE_SELECT' ? 0 : t.select_category ? 1 : 2;
+    txs.sort((a, b) => rank(a) - rank(b) || a.accession_version.localeCompare(b.accession_version));
+    PROD._txs = txs;
+    const sel = $('#txSelect'); sel.disabled = false;
+    sel.innerHTML = txs.map((t, i) => `<option value="${i}">${esc(t.accession_version)}${t.select_category === 'MANE_SELECT' ? ' — MANE Select' : t.select_category ? ' — ' + esc(t.select_category.replace(/_/g, ' ')) : ''}${t.name ? ' · ' + esc(t.name) : ''}</option>`).join('');
+    await loadTranscript(0);
+  } catch (e) { setGeneState(''); toast(e.message, 5000); $('#geneInfo').innerHTML = `<div class="fb r" style="margin-top:10px">${esc(e.message)}</div>`; }
+}
+
+async function loadTranscript(i) {
+  const t = PROD._txs[i];
+  const symbol = PROD.symbol;
+  setGeneState(`<span class="spin"></span> fetching ${esc(t.accession_version)} sequences…`);
+  const locs = t.genomic_locations;
+  const loc = locs.find(g => /^NC_/.test(g.genomic_accession_version) && /Primary Assembly/i.test(g.sequence_name || '') && /GRCh38/i.test(g.sequence_name || ''))
+          || locs.find(g => /^NC_/.test(g.genomic_accession_version)) || locs[0];
+  const strand = loc.genomic_range.orientation === 'minus' ? -1 : 1;
+  const ex = loc.exons.map(e => ({b: +e.begin, e: +e.end, order: +e.order})).sort((a, b) => a.order - b.order);
+  const gMin = Math.min(...ex.map(e => e.b)), gMax = Math.max(...ex.map(e => e.e));
+  const start = gMin - FLANK, stop = gMax + FLANK;
+  const ck = `ssv-ref2-${t.accession_version}`;
+  let cached = recall(ck);
+  if (!cached || cached.start !== start || cached.stop !== stop) {
+    const fa = await ncbi(`${EU}/efetch.fcgi?db=nuccore&id=${loc.genomic_accession_version}&seq_start=${start}&seq_stop=${stop}&strand=${strand > 0 ? 1 : 2}&rettype=fasta&retmode=text`, 'text');
+    const genomic = fa.replace(/^>.*$/m, '').replace(/[^A-Za-z]/g, '').toUpperCase().replace(/[^ACGT]/g, 'N');
+    const gb = await ncbi(`${EU}/efetch.fcgi?db=nuccore&id=${t.accession_version}&rettype=gb&retmode=text`, 'text');
+    const origin = (gb.split(/\nORIGIN/)[1] || '').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const ccds = (gb.match(/CCDS:(CCDS[\d.]+)/) || [])[1] || '';
+    const map = (gb.match(/\/map="([^"]+)"/) || [])[1] || '';
+    const trans = ((gb.match(/\/translation="([^"]+)"/) || [])[1] || '').replace(/\s+/g, '');
+    cached = {start, stop, genomic, mrna: origin, ccds, map, trans};
+    if (genomic.length < 3e6) store(ck, cached);
+  }
+  const cr = t.cds.range;
+  const cdsS = +cr[0].begin, cdsE = +cr[cr.length - 1].end;
+  const exons = ex.map((e, k) => strand > 0 ? {n: k + 1, s: e.b - start, e: e.e - start} : {n: k + 1, s: stop - e.e, e: stop - e.b});
+  let m = 1; for (const e of exons) { e.mS = m; m += e.e - e.s + 1; e.mE = m - 1; }
+  const seq = cached.genomic;
+  const mpos = new Int32Array(seq.length);
+  for (const e of exons) for (let i = e.s; i <= e.e; i++) mpos[i] = e.mS + (i - e.s);
+  const assembled = exons.map(e => seq.slice(e.s, e.e + 1)).join('');
+  const mrna = cached.mrna || assembled;
+  const cds = mrna.slice(cdsS - 1, cdsE);
+  const chrN = parseInt(loc.genomic_accession_version.slice(3, 9), 10);
+  R = {
+    symbol, desc: PROD.description, geneId: PROD.gene_id, tx: t.accession_version, np: t.protein?.accession_version || '',
+    protName: t.protein?.name || '', ensT: t.ensembl_transcript || '', select: t.select_category || '',
+    ccds: cached.ccds, map: cached.map, chrAcc: loc.genomic_accession_version, chr: chrN === 23 ? 'X' : chrN === 24 ? 'Y' : String(chrN),
+    strand, gStart: start, gEnd: stop, seq, exons, cdsS, cdsE, mrna, mrnaLen: mrna.length, cds, prot: translate(cds), trans: cached.trans, mpos
+  };
+  const ci = []; for (let i = 0; i < seq.length; i++) if (mpos[i] >= cdsS && mpos[i] <= cdsE) ci.push(i);
+  R.coding = Int32Array.from(ci);
+  R.gates = validateRef(assembled);
+  IDX = buildIndex(seq);
+  renderGene();
+  setGeneState(`${esc(symbol)} ready`);
+  const saved = recall(`ssv-primers-${symbol}`);
+  $('#primerText').value = saved || '';
+  locatePrimers(false);
+  ANN.clear();
+  READS.forEach(processRead);
+  refresh();
+  renderRef();
+}
+
+function validateRef(assembled) {
+  const g = [];
+  const add = (ok, label, tip) => g.push({ok, label, tip});
+  add(R.seq.length === R.gEnd - R.gStart + 1, `Genomic ${R.seq.length.toLocaleString()} bp`, 'Fetched length equals requested span (gene + 250 bp each side)');
+  add(assembled === R.mrna, 'Exons = mRNA', assembled === R.mrna ? 'Concatenated exons match the RefSeq mRNA exactly' : 'Concatenated genomic exons differ from the RefSeq mRNA — transcript/genome mismatch, check before trusting coordinates');
+  add(R.cds.startsWith('ATG'), 'CDS starts ATG', 'First codon of the CDS');
+  const stopOk = ['TAA', 'TAG', 'TGA'].includes(R.cds.slice(-3)) && R.cds.length % 3 === 0 && !R.prot.slice(0, -1).includes('*');
+  add(stopOk, `CDS ${R.cds.length} nt`, 'Length multiple of 3, ends on a stop codon, no internal stop');
+  if (R.trans) add(R.prot.replace(/\*$/, '') === R.trans, `Protein ${R.prot.length - 1} aa`, 'Translation matches the RefSeq /translation');
+  let bad = 0; for (let k = 0; k < R.exons.length - 1; k++) { const a = R.seq.slice(R.exons[k].e + 1, R.exons[k].e + 3), b = R.seq.slice(R.exons[k + 1].s - 2, R.exons[k + 1].s); if (!((a === 'GT' || a === 'GC') && b === 'AG')) bad++; }
+  add(bad === 0, bad ? `${bad} non-canonical intron(s)` : 'Introns GT/GC…AG', 'Splice-site dinucleotides');
+  return g;
+}
+
+function setGeneState(h) { $('#geneState').innerHTML = h; }
+function renderGene() {
+  const nc = R.exons.filter(e => R.mpos[e.s] <= R.cdsE && R.mpos[e.e] >= R.cdsS).length;
+  $('#geneInfo').innerHTML = `<div class="kv">
+    <b>Gene</b><span><strong>${esc(R.symbol)}</strong> · ${esc(R.desc || '')} · Gene ID ${esc(R.geneId)}${R.map ? ' · ' + esc(R.map) : ''}</span>
+    <b>Transcript</b><span class="mono">${esc(R.tx)}${R.select === 'MANE_SELECT' ? ' <span class="bdg info">MANE Select</span>' : ' <span class="bdg warn">not MANE Select</span>'}${R.ensT ? ' · ' + esc(R.ensT) : ''}</span>
+    <b>Protein</b><span class="mono">${esc(R.np)} · ${R.prot.length - 1} aa${R.ccds ? ' · ' + esc(R.ccds) : ''}</span>
+    <b>Locus</b><span class="mono">${esc(R.chrAcc)} (chr${esc(R.chr)}) ${R.strand > 0 ? '+' : '−'} strand · g.${(R.gStart + FLANK).toLocaleString()}–${(R.gEnd - FLANK).toLocaleString()} (GRCh38)</span>
+    <b>Structure</b><span>${R.exons.length} exons (${nc} coding) · CDS ${R.cds.length} nt (mRNA ${R.cdsS}–${R.cdsE}) · ±${FLANK} bp flanks</span></div>`;
+  $('#gates').innerHTML = R.gates.map(g => `<span class="bdg ${g.ok ? 'ok' : 'bad'}" title="${esc(g.tip)}">${g.ok ? '✓' : '✗'} ${esc(g.label)}</span>`).join('');
+}
+
+/* ---------------- coordinate mapping (ref index ↔ HGVS c.) ---------------- */
+function mToC(m) { return m < R.cdsS ? String(m - R.cdsS) : m > R.cdsE ? '*' + (m - R.cdsE) : String(m - R.cdsS + 1); }
+function exonAt(i) { let lo = 0, hi = R.exons.length - 1; while (lo <= hi) { const md = (lo + hi) >> 1, e = R.exons[md]; if (i < e.s) hi = md - 1; else if (i > e.e) lo = md + 1; else return md; } return -1 - lo; }
+function cLabel(i) {
+  const E = R.exons;
+  if (i < E[0].s) return mToC(1 - (E[0].s - i));
+  const L = E[E.length - 1]; if (i > L.e) return mToC(R.mrnaLen + (i - L.e));
+  const k = exonAt(i); if (k >= 0) return mToC(E[k].mS + (i - E[k].s));
+  const up = E[-k - 2], dn = E[-k - 1]; const du = i - up.e, dd = dn.s - i;
+  return du <= dd ? mToC(up.mE) + '+' + du : mToC(dn.mS) + '-' + dd;
+}
+function region(i) {
+  const E = R.exons;
+  if (i < E[0].s) return {kind: 'up', txt: "5′ upstream"};
+  if (i > E[E.length - 1].e) return {kind: 'down', txt: "3′ downstream"};
+  const k = exonAt(i);
+  if (k >= 0) { const m = R.mpos[i]; const sub = m < R.cdsS ? 'utr5' : m > R.cdsE ? 'utr3' : 'cds'; return {kind: 'exon', n: E[k].n, sub, txt: `exon ${E[k].n}` + (sub === 'utr5' ? " (5′UTR)" : sub === 'utr3' ? " (3′UTR)" : '')}; }
+  return {kind: 'intron', n: E[-k - 2].n, txt: `intron ${E[-k - 2].n}`};
+}
+function cToIndex(lbl) {
+  const s = String(lbl).trim().replace(/^c\./i, '');
+  const mt = s.match(/^([-*]?)(\d+)(?:([+-])(\d+))?$/); if (!mt) return null;
+  const n = +mt[2]; let m = mt[1] === '-' ? R.cdsS - n : mt[1] === '*' ? R.cdsE + n : n + R.cdsS - 1;
+  const E = R.exons, last = E[E.length - 1]; let i;
+  if (m < 1) i = E[0].s - (1 - m); else if (m > R.mrnaLen) i = last.e + (m - R.mrnaLen);
+  else { const e = E.find(x => m >= x.mS && m <= x.mE); i = e.s + (m - e.mS); }
+  if (mt[3]) i += (mt[3] === '+' ? 1 : -1) * +mt[4];
+  return (i >= 0 && i < R.seq.length) ? i : null;
+}
+const chrPos = i => R.strand > 0 ? R.gStart + i : R.gEnd - i;
+const cRange = (s, e) => s === e ? `c.${cLabel(s)}` : `c.${cLabel(s)}_${cLabel(e)}`;
+const isCoding = i => R.mpos[i] >= R.cdsS && R.mpos[i] <= R.cdsE;
+
+/* =====================================================================
+   2. AB1 (ABIF) parser
+   ===================================================================== */
+function parseAB1(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  if (String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== 'ABIF') throw new Error('not an ABIF file');
+  const n = dv.getInt32(18), off = dv.getInt32(26), tags = {};
+  for (let k = 0; k < n; k++) {
+    const p = off + k * 28; if (p + 28 > buf.byteLength) break;
+    const name = String.fromCharCode(u8[p], u8[p + 1], u8[p + 2], u8[p + 3]) + dv.getInt32(p + 4);
+    const size = dv.getInt32(p + 16), cnt = dv.getInt32(p + 12), es = dv.getInt16(p + 10);
+    tags[name] = {type: dv.getInt16(p + 8), es, cnt, size, at: size <= 4 ? p + 20 : dv.getInt32(p + 20)};
+  }
+  const chars = t => { const x = tags[t]; if (!x) return null; let s = ''; for (let i = 0; i < x.size; i++) s += String.fromCharCode(u8[x.at + i]); return s; };
+  const bytes = t => { const x = tags[t]; return x ? u8.slice(x.at, x.at + x.size) : null; };
+  const shorts = (t, unsigned) => { const x = tags[t]; if (!x) return null; const a = new (unsigned ? Uint16Array : Int16Array)(x.cnt); for (let i = 0; i < x.cnt; i++) a[i] = unsigned ? dv.getUint16(x.at + i * 2) : dv.getInt16(x.at + i * 2); return a; };
+  const base = (chars('PBAS2') || chars('PBAS1') || '').toUpperCase().replace(/[^ACGTRYSWKMBDHVN]/g, 'N');
+  const ploc = shorts('PLOC2', true) || shorts('PLOC1', true);
+  const qual = bytes('PCON2') || bytes('PCON1');
+  const order = (chars('FWO_1') || 'GATC').toUpperCase();
+  const tr = {};
+  for (let c = 0; c < 4; c++) { const d = shorts('DATA' + (9 + c)) || shorts('DATA' + (1 + c)); tr[order[c]] = d; }
+  if (!base || !ploc || !tr.A) throw new Error('AB1 file has no basecalls or traces');
+  const nb = Math.min(base.length, ploc.length);
+  return {base: base.slice(0, nb), ploc: ploc.slice(0, nb), qual: qual ? qual.slice(0, nb) : null, tr, scans: tr.A.length};
+}
+
+/* heterozygous calling from the four trace channels */
+function peakH(ab, raw, b) { const t = ab.tr[b], p = ab.ploc[raw]; let m = 0; for (let x = p - 1; x <= p + 1; x++) if (x >= 0 && x < t.length && t[x] > m) m = t[x]; return m; }
+function isApex(t, p) { let a = p - 3, best = -1; for (let x = Math.max(0, p - 3); x <= Math.min(t.length - 1, p + 3); x++) if (t[x] > best) { best = t[x]; a = x; } if (Math.abs(a - p) > 2) return false; const l = t[Math.max(0, a - 4)], r = t[Math.min(t.length - 1, a + 4)]; return best > l * 1.15 && best > r * 1.15; }
+function callBases(ab, thr) {
+  const n = ab.base.length, calls = new Array(n), ratio = new Float32Array(n), prim = [];
+  const pri = new Array(n), sec = new Array(n), sig = new Uint8Array(n);
+  for (let j = 0; j < n; j++) { const b = ab.base[j]; if ('ACGT'.includes(b)) prim.push(peakH(ab, j, b)); }
+  prim.sort((a, b) => a - b); const med = prim.length ? prim[prim.length >> 1] : 0;
+  for (let j = 0; j < n; j++) {
+    const b = ab.base[j];
+    const h = {A: peakH(ab, j, 'A'), C: peakH(ab, j, 'C'), G: peakH(ab, j, 'G'), T: peakH(ab, j, 'T')};
+    let p = 'ACGT'.includes(b) ? b : null;
+    if (!p) { let best = -1; for (const x of 'ACGT') if (h[x] > best) { best = h[x]; p = x; } }
+    let s2 = null, h2 = -1; for (const x of 'ACGT') if (x !== p && h[x] > h2) { h2 = h[x]; s2 = x; }
+    const r = h[p] > 0 ? h2 / h[p] : 0; ratio[j] = r; pri[j] = p; sec[j] = s2;
+    const apex = isApex(ab.tr[s2], ab.ploc[j]);
+    if (h[p] >= 0.35 * med && apex && r >= 0.2) sig[j] = 1;   // a real-looking second peak (used for mixed-trace detection)
+    if (!'ACGT'.includes(b)) { calls[j] = b; continue; }      // keep basecaller N / mixed-base calls as they are
+    calls[j] = (r >= thr && h[p] >= 0.1 * med && apex) ? codeOf(p + s2) : p;
+  }
+  return {calls, ratio, pri, sec, sig};
+}
+function mottTrim(q, Q) {
+  if (!q) return null; const lim = Math.pow(10, -Q / 10); let best = 0, bs = 0, be = -1, cur = 0, cs = 0;
+  for (let i = 0; i < q.length; i++) { cur += lim - Math.pow(10, -q[i] / 10); if (cur < 0) { cur = 0; cs = i + 1; } else if (cur > best) { best = cur; bs = cs; be = i; } }
+  return be < 0 ? [0, -1] : [bs, be];
+}
+/* Mixed-trace detection. A heterozygous indel makes the trace a superposition of two
+   copies of the same sequence offset by the indel length, so from the indel onward the
+   secondary peaks spell the primary sequence shifted by k bases. We look for dense runs of
+   genuine secondary peaks, then test every shift |k| ≤ 15 for that signature.
+   Scans past the quality-trim end, because a het indel is often exactly where reads get trimmed. */
+function findMixed(cb, ts, te) {
+  const n = cb.sig.length, lo = ts, hi = Math.min(n - 1, te + 120), W = 20, MIN = 7, mark = new Uint8Array(n); let cnt = 0;
+  for (let j = lo; j <= hi; j++) {
+    cnt += cb.sig[j]; if (j - W >= lo) cnt -= cb.sig[j - W];
+    if (j - lo + 1 >= W && cnt >= MIN) for (let x = j - W + 1; x <= j; x++) mark[x] = 1;
+  }
+  const out = []; let a = -1;
+  for (let j = lo; j <= hi + 1; j++) {
+    if (j <= hi && mark[j]) { if (a < 0) a = j; continue; }
+    if (a < 0) continue;
+    const b = j - 1; a = Math.max(lo, a); let bestK = 0, bestF = 0, second = 0, nS = 0;
+    for (let k = -15; k <= 15; k++) {
+      if (!k) continue; let m = 0, t = 0;
+      for (let x = a; x <= b; x++) { if (!cb.sig[x] || x + k < 0 || x + k >= n) continue; t++; if (cb.sec[x] === cb.pri[x + k]) m++; }
+      if (t >= 8) { const f = m / t; if (f > bestF) { second = bestF; bestF = f; bestK = k; nS = t; } else if (f > second) second = f; }
+    }
+    // trim the start to the first secondary peak that fits the shift
+    // a real het indel: many secondary peaks, most fitting ONE shift clearly better than any other (chance ≈ 25–35%)
+    const strong = nS >= 15 && bestF >= 0.7 && bestF - second >= 0.25 && b - a + 1 >= 25;
+    if (!strong) bestF = Math.min(bestF, 0.59);
+    let start = a; if (bestF >= 0.6) { for (let x = a; x <= b; x++) if (cb.sig[x] && cb.sec[x] === cb.pri[x + bestK]) { start = x; break; } }
+    const indel = bestF >= 0.6;
+    if (indel || b <= te) out.push({a: start, b, shift: indel ? bestK : 0, frac: bestF, n: nS, beyondTrim: start > te});
+    a = -1;
+  }
+  return out;
+}
+
+/* =====================================================================
+   3. Alignment: k-mer seeding + affine-gap Smith-Waterman (Gotoh)
+   ===================================================================== */
+const K = 10, MAXOCC = 60;
+function buildIndex(seq) {
+  const size = 1 << (2 * K), mask = size - 1, first = new Int32Array(size).fill(-1), cnt = new Uint16Array(size), next = new Int32Array(seq.length);
+  let code = 0, run = 0;
+  for (let i = 0; i < seq.length; i++) { const v = NT[seq.charCodeAt(i)]; if (v < 0) { run = 0; code = 0; continue; } code = ((code << 2) | v) & mask; if (++run >= K) { const p = i - K + 1; next[p] = first[code]; first[code] = p; if (cnt[code] < 65535) cnt[code]++; } }
+  return {first, next, cnt};
+}
+function seed(q) {
+  const votes = new Map(), mask = (1 << (2 * K)) - 1; let code = 0, run = 0;
+  for (let i = 0; i < q.length; i++) {
+    const v = NT[q.charCodeAt(i)]; if (v < 0) { run = 0; code = 0; continue; }
+    code = ((code << 2) | v) & mask;
+    if (++run >= K) { if (IDX.cnt[code] > MAXOCC) continue; const qp = i - K + 1; for (let p = IDX.first[code]; p !== -1; p = IDX.next[p]) { const b = (p - qp) >> 4; votes.set(b, (votes.get(b) || 0) + 1); } }
+  }
+  let best = 0, bv = 0; for (const [b, c] of votes) { const s = c + (votes.get(b - 1) || 0) + (votes.get(b + 1) || 0); if (s > bv) { bv = s; best = b; } }
+  return {diag: best * 16, votes: bv};
+}
+const SC = new Int8Array(128 * 128).fill(-3);
+for (const q of Object.keys(IUPAC)) for (const r of 'ACGTN') {
+  const set = IUPAC[q]; let v;
+  if (q === 'N' || r === 'N') v = 0; else if (set.length === 1) v = q === r ? 2 : -3; else if (set.length === 2) v = set.includes(r) ? 1 : -3; else v = set.includes(r) ? 0 : -3;
+  SC[q.charCodeAt(0) * 128 + r.charCodeAt(0)] = v;
+}
+const GO = -7, GE = -1, NEG = -1e9;
+function sw(q, t) {
+  const n = q.length, m = t.length, W = m + 1;
+  let Hp = new Int32Array(W), Hc = new Int32Array(W); const F = new Int32Array(W).fill(NEG), tb = new Uint8Array((n + 1) * W);
+  let best = 0, bi = 0, bj = 0;
+  for (let i = 1; i <= n; i++) {
+    Hc[0] = 0; let e = NEG; const qa = q.charCodeAt(i - 1) * 128, row = i * W;
+    for (let j = 1; j <= m; j++) {
+      let tv = 0;
+      const eo = Hc[j - 1] + GO, ee = e + GE; if (ee > eo) { e = ee; tv |= 4; } else e = eo;
+      const fo = Hp[j] + GO, fe = F[j] + GE; let f; if (fe > fo) { f = fe; tv |= 8; } else f = fo; F[j] = f;
+      const d = Hp[j - 1] + SC[qa + t.charCodeAt(j - 1)];
+      let h = 0, src = 0; if (d > h) { h = d; src = 1; } if (e > h) { h = e; src = 2; } if (f > h) { h = f; src = 3; }
+      Hc[j] = h; tb[row + j] = tv | src;
+      if (h > best) { best = h; bi = i; bj = j; }
+    }
+    const tmp = Hp; Hp = Hc; Hc = tmp;
+  }
+  const qi = [], rj = []; let i = bi, j = bj, st = 0;
+  while (i > 0 || j > 0) {
+    const v = tb[i * W + j];
+    if (st === 0) { const s = v & 3; if (s === 0 || i === 0 || j === 0) break; if (s === 1) { qi.push(i - 1); rj.push(j - 1); i--; j--; } else st = s === 2 ? 1 : 2; }
+    else if (st === 1) { qi.push(-1); rj.push(j - 1); const ext = v & 4; j--; if (!ext) st = 0; }
+    else { qi.push(i - 1); rj.push(-1); const ext = v & 8; i--; if (!ext) st = 0; }
+  }
+  qi.reverse(); rj.reverse();
+  return {score: best, qi, rj};
+}
+function alignOne(q) {
+  const s = seed(q); if (s.votes < 3) return null;
+  const ws = Math.max(0, s.diag - 150), we = Math.min(R.seq.length, s.diag + q.length + 150);
+  if (we - ws < 20) return null;
+  const a = sw(q, R.seq.slice(ws, we));
+  a.rj = a.rj.map(x => x < 0 ? -1 : x + ws);
+  return a;
+}
+
+/* =====================================================================
+   4. Read processing: call → trim → align → extract variants
+   ===================================================================== */
+function processRead(r) {
+  r.res = null; if (!R) return;
+  let calls, ratio = null, ts = 0, te, cb = null;
+  if (r.ab) {
+    const c = callBases(r.ab, ST.het); cb = c; calls = c.calls; ratio = c.ratio;
+    te = calls.length - 1;
+    if (ST.trim && r.ab.qual) { const t = mottTrim(r.ab.qual, ST.trimQ); [ts, te] = t; }
+  } else { calls = r.seq.split(''); te = calls.length - 1; }
+  const res = {calls, ratio, ts, te, status: 'ok', events: [], mixRef: [], mixInfo: [], mixed: []};
+  r.res = res;
+  if (te - ts + 1 < 30) { res.status = 'short'; return; }
+  res.mixed = cb ? findMixed(cb, ts, te) : [];
+  const trimmed = calls.slice(ts, te + 1).join('');
+  const fw = alignOne(trimmed), rv = alignOne(revcomp(trimmed));
+  let best = null, rev = false;
+  if (fw && (!rv || fw.score >= rv.score)) best = fw; else if (rv) { best = rv; rev = true; }
+  if (!best || !best.qi.length) { res.status = 'nomatch'; return; }
+  const q = rev ? revcomp(trimmed) : trimmed;
+  const raw = k => rev ? te - k : ts + k;
+  const {qi, rj} = best;
+  let rs = -1, re = -1, aligned = 0, ident = 0;
+  for (let c = 0; c < qi.length; c++) {
+    if (rj[c] >= 0) { if (rs < 0) rs = rj[c]; re = rj[c]; }
+    aligned++;
+    if (qi[c] >= 0 && rj[c] >= 0 && SC[q.charCodeAt(qi[c]) * 128 + R.seq.charCodeAt(rj[c])] > 0) ident++;
+  }
+  Object.assign(res, {rev, q, qi, rj, rs, re, score: best.score, ident: ident / aligned, rawOf: raw});
+  if (re - rs + 1 < 30 || res.ident < 0.8) { res.status = 'lowid'; return; }
+  // ref-anchored view
+  const span = re - rs + 1, chars = new Array(span).fill(' '), rawAt = new Int32Array(span).fill(-1), ins = new Map();
+  let lastR = -1, pend = '';
+  for (let c = 0; c < qi.length; c++) {
+    if (rj[c] >= 0) {
+      if (pend) { ins.set(lastR, pend); pend = ''; }
+      if (qi[c] >= 0) { chars[rj[c] - rs] = q[qi[c]]; rawAt[rj[c] - rs] = raw(qi[c]); } else chars[rj[c] - rs] = '-';
+      lastR = rj[c];
+    } else pend += q[qi[c]];
+  }
+  Object.assign(res, {chars, rawAt, ins});
+  // mixed-trace regions → ref coords
+  let minRaw = Infinity, maxRaw = -1, refAtMin = -1, refAtMax = -1;
+  for (let x = 0; x < span; x++) { const w = rawAt[x]; if (w < 0) continue; if (w < minRaw) { minRaw = w; refAtMin = rs + x; } if (w > maxRaw) { maxRaw = w; refAtMax = rs + x; } }
+  const clampI = i => Math.max(0, Math.min(R.seq.length - 1, i));
+  for (const m of res.mixed) {
+    let s = Infinity, e = -1; for (let x = 0; x < span; x++) if (rawAt[x] >= m.a && rawAt[x] <= m.b) { s = Math.min(s, rs + x); e = Math.max(e, rs + x); }
+    if (e >= 0) res.mixRef.push([s, e]);
+    // where does the mixed trace START in gene coordinates (read 5'→3' = raw a)
+    let start, approx = false;
+    const exact = (() => { for (let x = 0; x < span; x++) if (rawAt[x] === m.a) return rs + x; return -1; })();
+    if (exact >= 0) start = exact;
+    else { approx = true; const off = m.a > maxRaw ? m.a - maxRaw : m.a - minRaw, anchor = m.a > maxRaw ? refAtMax : refAtMin; start = clampI(rev ? anchor - off : anchor + off); }
+    const end = clampI(rev ? start - (m.b - m.a) : start + (m.b - m.a));
+    res.mixInfo.push({start, end, approx, shift: m.shift, frac: m.frac, beyondTrim: m.beyondTrim});
+  }
+  // duplicate detection key
+  res.sig = q.slice(0, 400);
+  res.events = extractEvents(r, res);
+}
+
+function inMix(res, i) { return res.mixRef.some(([a, b]) => i >= a && i <= b); }
+function extractEvents(r, res) {
+  const {q, qi, rj} = res, ref = R.seq, ev = [], n = qi.length, EDGE = ST.edge;
+  const qualAt = raw => (r.ab && r.ab.qual && raw >= 0) ? r.ab.qual[raw] : null;
+  const isGap = c => qi[c] < 0 || rj[c] < 0;
+  const plainMM = c => qi[c] >= 0 && rj[c] >= 0 && 'ACGT'.includes(q[qi[c]]) && q[qi[c]] !== ref[rj[c]];
+  const isMatch = c => c < n && qi[c] >= 0 && rj[c] >= 0 && q[qi[c]] === ref[rj[c]];
+  // HGVS: changes in the same read separated by ≤ 1 unchanged nucleotide form one delins (hom calls only; het phase is unknown)
+  const blocky = c => c < n && (isGap(c) || plainMM(c));
+  const joins = c => blocky(c) || (isMatch(c) && blocky(c + 1));
+  const blockEnd = c => { let b = c; while (b + 1 < n && joins(b + 1)) { b++; if (isMatch(b)) b++; } while (b > c && isMatch(b)) b--; return b; };
+  const hasGap = (a, b) => { for (let x = a; x <= b; x++) if (isGap(x)) return true; return false; };
+  let c = 0;
+  while (c < n) {
+    if (!isGap(c) && !(plainMM(c) && joins(c + 1) && hasGap(c, blockEnd(c)))) {
+      const a = q[qi[c]], b = ref[rj[c]], i = rj[c];
+      if (a !== b && a !== 'N' && b !== 'N') {
+        const rawI = res.rawOf(qi[c]);
+        const base = {s: i, e: i, rawI, q: qualAt(rawI), ratio: res.ratio ? res.ratio[rawI] : null, edge: c < EDGE || c > n - 1 - EDGE, mixed: inMix(res, i)};
+        const set = IUPAC[a] || '';
+        if (set.length === 1) ev.push({...base, kind: 'snv', ref: b, alt: a, zyg: 'hom', adj: plainMM(c - 1) || plainMM(c + 1) || plainMM(c - 2) && isMatch(c - 1) || plainMM(c + 2) && isMatch(c + 1)});
+        else if (set.length === 2) {
+          if (set.includes(b)) ev.push({...base, kind: 'snv', ref: b, alt: set.replace(b, ''), zyg: 'het'});
+          else for (const x of set) ev.push({...base, kind: 'snv', ref: b, alt: x, zyg: 'het', twoAlt: true});
+        }
+      }
+      c++; continue;
+    }
+    // indel / MNV block: gaps and plain mismatches, bridging single unchanged nucleotides
+    let a = c, b = blockEnd(c);
+    let refA = '', alt = '', firstR = -1, lastR = -1;
+    for (let x = a; x <= b; x++) { if (rj[x] >= 0) { refA += ref[rj[x]]; if (firstR < 0) firstR = rj[x]; lastR = rj[x]; } if (qi[x] >= 0) alt += (IUPAC[q[qi[x]]] || 'N')[0]; }
+    let prevR = -1; for (let x = a - 1; x >= 0; x--) if (rj[x] >= 0) { prevR = rj[x]; break; }
+    let rawI = -1; for (let x = a; x >= 0; x--) if (qi[x] >= 0) { rawI = res.rawOf(qi[x]); break; }
+    const base = {rawI, q: qualAt(rawI), ratio: null, edge: a < EDGE || b > n - 1 - EDGE, zyg: 'hom', mixed: false};
+    if (!refA) ev.push({...base, kind: 'ins', p: prevR, alt});
+    else ev.push({...base, kind: alt ? 'delins' : 'del', s: firstR, e: lastR, ref: refA, alt});
+    base.mixed = inMix(res, firstR >= 0 ? firstR : prevR);
+    ev[ev.length - 1].mixed = base.mixed;
+    c = b + 1;
+  }
+  return ev.map(e => Object.assign(e, normalize(e))).filter(e => e.hgvs);
+}
+
+/* HGVS normalisation (3′ rule in transcript orientation) */
+function normalize(ev) {
+  const L = R.seq;
+  if (ev.kind === 'snv') return {hgvs: `c.${cLabel(ev.s)}${ev.ref}>${ev.alt}`};
+  let {kind} = ev;
+  if (kind === 'delins') {
+    let s = ev.s, e = ev.e, ref = ev.ref, alt = ev.alt;
+    while (ref && alt && ref[0] === alt[0]) { ref = ref.slice(1); alt = alt.slice(1); s++; }
+    while (ref && alt && ref[ref.length - 1] === alt[alt.length - 1]) { ref = ref.slice(0, -1); alt = alt.slice(0, -1); e--; }
+    if (!ref && !alt) return {hgvs: null};
+    if (!alt) return normalize({...ev, kind: 'del', s, e, ref, alt: ''});
+    if (!ref) return normalize({...ev, kind: 'ins', p: s - 1, alt});
+    if (ref.length === 1 && alt.length === 1) return {kind: 'snv', s, e: s, ref, alt, hgvs: `c.${cLabel(s)}${ref}>${alt}`};
+    return {kind: 'delins', s, e, ref, alt, hgvs: `${cRange(s, e)}delins${alt}`};
+  }
+  if (kind === 'del') {
+    let s = ev.s, e = ev.e; while (e + 1 < L.length && L[e + 1] === L[s]) { s++; e++; }
+    return {kind: 'del', s, e, ref: L.slice(s, e + 1), alt: '', hgvs: `${cRange(s, e)}del`};
+  }
+  if (kind === 'ins') {
+    let p = ev.p, X = ev.alt; if (p < 0) return {hgvs: null};
+    while (p + 1 < L.length && L[p + 1] === X[0]) { X = X.slice(1) + X[0]; p++; }
+    const k = X.length;
+    if (p - k + 1 >= 0 && L.slice(p - k + 1, p + 1) === X) return {kind: 'dup', s: p - k + 1, e: p, ref: '', alt: X, hgvs: `${cRange(p - k + 1, p)}dup`};
+    return {kind: 'ins', s: p, e: p + 1, ref: '', alt: X, hgvs: `c.${cLabel(p)}_${cLabel(p + 1)}ins${X}`};
+  }
+  return {hgvs: null};
+}
+
+/* local consequence prediction */
+function consequence(v) {
+  const rg = region(v.s);
+  const out = {loc: rg.txt, p: '', type: '', effect: ''};
+  const lbl = cLabel(v.s), lblE = cLabel(v.e);
+  const off = l => { const m = l.match(/([+-])(\d+)$/); return m && /\d[+-]\d+$/.test(l) ? (m[1] === '+' ? 1 : -1) * +m[2] : 0; };
+  const o1 = off(lbl), o2 = off(lblE);
+  const spl = [o1, o2].filter(Boolean);
+  const splice = () => {
+    if (spl.some(o => Math.abs(o) <= 2)) return spl.some(o => o > 0 && o <= 2) ? 'canonical splice donor (+1/+2)' : 'canonical splice acceptor (−1/−2)';
+    if (spl.some(o => (o > 0 && o <= 8) || (o < 0 && o >= -12))) return 'splice region';
+    return '';
+  };
+  if (v.kind === 'snv' && rg.kind === 'exon' && rg.sub === 'cds') {
+    const m = R.mpos[v.s], cp = m - R.cdsS + 1, cn = Math.ceil(cp / 3), o = (cp - 1) % 3;
+    const cod = R.cds.slice((cn - 1) * 3, cn * 3), mut = cod.slice(0, o) + v.alt + cod.slice(o + 1);
+    const a = tr1(cod), b = tr1(mut);
+    if (cn === 1 && a === 'M' && b !== 'M') Object.assign(out, {p: 'p.(Met1?)', type: 'start lost'});
+    else if (a === b) Object.assign(out, {p: `p.(${AA3[a]}${cn}=)`, type: 'synonymous'});
+    else if (b === '*') Object.assign(out, {p: `p.(${AA3[a]}${cn}Ter)`, type: 'nonsense'});
+    else if (a === '*') Object.assign(out, {p: `p.(Ter${cn}${AA3[b]}extTer?)`, type: 'stop lost'});
+    else Object.assign(out, {p: `p.(${AA3[a]}${cn}${AA3[b]})`, type: 'missense'});
+    // exonic splice region (within 3 nt of an internal exon edge)
+    const k = exonAt(v.s), e = R.exons[k];
+    if ((k > 0 && v.s - e.s < 3) || (k < R.exons.length - 1 && e.e - v.s < 3)) out.effect = 'exonic splice region';
+  } else if (v.kind !== 'snv' && [v.s, v.e].some(i => isCoding(i))) {
+    const d = v.kind === 'del' ? -(v.e - v.s + 1) : v.kind === 'dup' || v.kind === 'ins' ? v.alt.length : v.alt.length - v.ref.length;
+    out.type = d % 3 ? 'frameshift' : (v.kind === 'del' ? 'in-frame deletion' : v.kind === 'delins' ? 'in-frame delins' : 'in-frame insertion');
+    out.effect = splice();
+  } else if (rg.kind === 'intron') { out.type = splice() || 'intronic'; }
+  else if (rg.kind === 'exon') out.type = rg.sub === 'utr5' ? "5′UTR" : "3′UTR";
+  else out.type = rg.kind === 'up' ? 'upstream' : 'downstream';
+  if (!out.effect && rg.kind !== 'intron') out.effect = splice();
+  return out;
+}
+
+/* =====================================================================
+   5. Merge variants across reads, coverage, flags
+   ===================================================================== */
+function readCovers(r, i) { const x = r.res; return x && x.chars && i >= x.rs && i <= x.re && x.chars[i - x.rs] !== 'N' && x.chars[i - x.rs] !== ' '; }
+function baseAt(r, i) { const x = r.res; return x.chars[i - x.rs]; }
+function altPeak(r, i, alt) {
+  const x = r.res; if (!r.ab || !x.rawAt) return null; const raw = x.rawAt[i - x.rs]; if (raw < 0) return null;
+  const b = x.rev ? COMP[alt] : alt, refB = x.rev ? COMP[R.seq[i]] : R.seq[i];
+  const ha = peakH(r.ab, raw, b), hr = peakH(r.ab, raw, refB); return hr > 0 ? ha / hr : null;
+}
+const goodReads = () => READS.filter(r => r.on && r.res && r.res.status === 'ok');
+
+function computeVariants() {
+  VARS = [];
+  if (!R) return;
+  const map = new Map(), reads = goodReads();
+  for (const r of reads) for (const e of r.res.events) {
+    if (e.mixed && e.kind === 'snv' && e.zyg === 'het') continue; // suppressed inside mixed traces
+    let v = map.get(e.hgvs);
+    if (!v) { v = {key: R.tx + ':' + e.hgvs, hgvs: e.hgvs, kind: e.kind, s: e.s, e: e.e, ref: e.ref, alt: e.alt, sup: [], other: []}; map.set(e.hgvs, v); }
+    if (!v.sup.some(s => s.r === r)) v.sup.push({r, zyg: e.zyg, q: e.q, ratio: e.ratio, edge: e.edge, twoAlt: e.twoAlt, rawI: e.rawI, mixed: e.mixed, adj: e.adj});
+  }
+  for (const v of map.values()) {
+    for (const r of reads) {
+      if (v.sup.some(s => s.r === r)) continue;
+      let cov = true; for (let i = v.s; i <= v.e; i++) if (!readCovers(r, i)) { cov = false; break; }
+      if (cov) v.other.push({r, base: baseAt(r, v.s), alt: v.kind === 'snv' ? altPeak(r, v.s, v.alt) : null});
+    }
+    const zs = new Set(v.sup.map(s => s.zyg));
+    v.zyg = zs.size > 1 ? 'discordant' : [...zs][0];
+    Object.assign(v, consequence(v));
+    const f = [];
+    if (v.other.length) f.push({t: `not seen in ${v.other.map(o => o.r.name + (o.alt != null ? ` (alt peak ${Math.round(o.alt * 100)}%)` : '')).join(', ')}`, c: 'r'});
+    if (v.zyg === 'discordant') f.push({t: 'zygosity differs between reads', c: 'r'});
+    if (v.sup.length === 1 && !v.other.length) f.push({t: 'single read', c: ''});
+    else if (v.sup.length > 1) {
+      const dirs = new Set(v.sup.map(s => s.r.res.rev)); f.push({t: dirs.size > 1 ? 'F + R confirmed' : `${v.sup.length} reads, same direction`, c: 'g'});
+    }
+    if (v.sup.every(s => s.edge)) f.push({t: 'read edge', c: ''});
+    if (v.sup.some(s => s.twoAlt)) f.push({t: 'IUPAC code excludes reference base', c: 'r'});
+    if (v.sup.some(s => s.mixed)) f.push({t: 'inside mixed-trace region', c: 'r'});
+    if (v.sup.some(s => s.adj)) f.push({t: 'next to another change — HGVS: one delins if in cis', c: 'g'});
+    const qs = v.sup.map(s => s.q).filter(q => q != null);
+    if (qs.length && Math.max(...qs) < 20 && v.zyg !== 'het') f.push({t: `low quality (Q${Math.max(...qs)})`, c: ''});
+    if (v.zyg === 'het' && v.sup.some(s => s.r.ab)) f.push({t: 'check trace', c: 'g'});
+    if (v.kind !== 'snv' && v.kind !== 'del' && v.alt && /^(.)\1+$/.test(v.alt + (v.ref || ''))) f.push({t: 'homopolymer', c: ''});
+    if (v.kind === 'del' && v.ref && /^(.)\1*$/.test(v.ref) && (R.seq[v.s - 1] === v.ref[0] || R.seq[v.e + 1] === v.ref[0])) f.push({t: 'homopolymer', c: ''});
+    v.flags = f;
+    VARS.push(v);
+  }
+  VARS.sort((a, b) => a.s - b.s || a.hgvs.localeCompare(b.hgvs));
+  if (ST.auto) for (const v of VARS) if (!ANN.has(v.key)) annotate(v.key);
+}
+
+function coverageArrays() {
+  const L = R.seq.length, f = new Uint16Array(L), rv = new Uint16Array(L);
+  for (const r of goodReads()) { const x = r.res, arr = x.rev ? rv : f; for (let i = x.rs; i <= x.re; i++) { const ch = x.chars[i - x.rs]; if (ch !== 'N' && ch !== ' ') arr[i]++; } }
+  return {f, rv};
+}
+
+/* =====================================================================
+   6. Primers
+   ===================================================================== */
+function parsePrimers(txt) {
+  const items = [];
+  for (const line of txt.split(/\r?\n/)) {
+    const t = line.trim(); if (!t || t.startsWith('#')) continue;
+    const toks = t.split(/[\s,;:\t]+/).filter(Boolean);
+    const seqs = toks.filter(x => /^[ACGTRYSWKMBDHVNacgtryswkmbdhvn]{12,}$/.test(x));
+    const name = toks.filter(x => !seqs.includes(x)).join(' ') || `primer${items.length + 1}`;
+    if (seqs.length >= 2) { items.push({name: name + '-F', seq: seqs[0].toUpperCase(), base: name, dir: 'F'}, {name: name + '-R', seq: seqs[1].toUpperCase(), base: name, dir: 'R'}); continue; }
+    if (!seqs.length) continue;
+    const m = name.match(/^(.*?)[-_. ]?(F|FW|FWD|FOR|FORWARD|R|RV|REV|REVERSE)$/i);
+    items.push({name, seq: seqs[0].toUpperCase(), base: m ? m[1] : name, dir: m ? (m[2][0].toUpperCase() === 'F' ? 'F' : 'R') : '?'});
+  }
+  const pairs = new Map(), loose = [];
+  for (const p of items) { if (p.dir === '?') { loose.push(p); continue; } const k = p.base.toUpperCase(); if (!pairs.has(k)) pairs.set(k, {name: p.base}); pairs.get(k)[p.dir] = p; }
+  for (let i = 0; i + 1 < loose.length; i += 2) pairs.set('_' + i, {name: loose[i].name + '/' + loose[i + 1].name, F: loose[i], R: loose[i + 1]});
+  return [...pairs.values()];
+}
+function findPrimer(seq) {
+  const hits = [];
+  const scan = (p, strand) => {
+    let i = R.seq.indexOf(p); while (i >= 0) { hits.push({s: i, e: i + p.length - 1, strand, mm: 0}); i = R.seq.indexOf(p, i + 1); }
+  };
+  const p = seq.replace(/[^A-Z]/g, ''); scan(p, '+'); scan(revcomp(p), '-');
+  if (hits.length) return hits;
+  for (const [q, strand] of [[p, '+'], [revcomp(p), '-']]) {
+    const n = q.length;
+    for (let i = 0; i + n <= R.seq.length; i++) { let mm = 0; for (let k = 0; k < n && mm <= 2; k++) if (R.seq[i + k] !== q[k] && !(IUPAC[q[k]] || '').includes(R.seq[i + k])) mm++; if (mm <= 2) hits.push({s: i, e: i + n - 1, strand, mm}); }
+  }
+  return hits;
+}
+function locatePrimers(save = true) {
+  if (!R) { if (save) toast('Load a gene first'); return; }
+  const txt = $('#primerText').value;
+  if (save) store(`ssv-primers-${R.symbol}`, txt);
+  AMPS = [];
+  for (const pr of parsePrimers(txt)) {
+    const a = {name: pr.name, notes: [], ok: false};
+    if (!pr.F || !pr.R) { a.notes.push('missing ' + (!pr.F ? 'forward' : 'reverse') + ' primer'); AMPS.push(a); continue; }
+    const hf = findPrimer(pr.F.seq), hr = findPrimer(pr.R.seq);
+    if (!hf.length || !hr.length) { a.notes.push(`${!hf.length ? 'F' : 'R'} primer not found in ${R.symbol} (±2 mismatches)`); AMPS.push(a); continue; }
+    let best = null;
+    for (const x of hf) for (const y of hr) { if (x.strand === y.strand) continue; const s = Math.min(x.s, y.s), e = Math.max(x.e, y.e), size = e - s + 1; if (size > 5000) continue; if (!best || size < best.size) best = {x, y, s, e, size}; }
+    if (!best) { a.notes.push('primers do not form an amplicon < 5 kb'); AMPS.push(a); continue; }
+    const five = best.x.s < best.y.s ? best.x : best.y, three = five === best.x ? best.y : best.x;
+    Object.assign(a, {ok: true, s: best.s, e: best.e, size: best.size, ins: [five.e + 1, three.s - 1], fFive: five === best.x});
+    if (hf.length > 1 || hr.length > 1) a.notes.push('primer matches several sites');
+    if (best.x.mm || best.y.mm) a.notes.push(`${best.x.mm + best.y.mm} mismatch(es) vs reference`);
+    a.notes.push(a.fFive ? 'F read → gene direction' : 'F read ← opposite to gene (minus-oriented)');
+    const ex = R.exons.filter(e => e.e >= a.ins[0] && e.s <= a.ins[1]).map(e => e.n);
+    a.exons = ex.length ? (ex.length > 1 ? `${ex[0]}–${ex[ex.length - 1]}` : String(ex[0])) : 'intronic';
+    AMPS.push(a);
+  }
+  renderPrimers(); refresh();
+}
+function renderPrimers() {
+  const ok = AMPS.filter(a => a.ok);
+  $('#primerState').textContent = AMPS.length ? `${ok.length}/${AMPS.length} located` : '';
+  $('#primerTable').innerHTML = AMPS.length ? AMPS.map(a => a.ok ?
+    `<tr><td><b>${esc(a.name)}</b></td><td class="mono">${a.size} bp</td><td class="mono">${cRange(a.ins[0], a.ins[1])}</td><td>${esc(a.exons)}</td><td class="small muted">${esc(a.notes.join(' · '))}</td></tr>` :
+    `<tr><td><b>${esc(a.name)}</b></td><td colspan="4"><span class="fl r">${esc(a.notes.join(' · '))}</span></td></tr>`).join('') :
+    `<tr><td colspan="5" class="muted small">No primers entered.</td></tr>`;
+}
+
+/* =====================================================================
+   7. Annotation — batched & parallel:
+      local genomic normalisation → [VariantValidator ∥ ClinVar ∥ gnomAD ∥ MobiDetails]
+      Results cached in this browser for ANN_TTL.
+   ===================================================================== */
+const ANN_TTL = 7 * 864e5;
+const MD = 'https://mobidetails.chu-montpellier.fr';
+let PLUS = null; // plus-strand genomic sequence (gStart…gEnd)
+function plusSeq() { if (!PLUS || PLUS.tx !== R.tx) PLUS = {tx: R.tx, s: R.strand > 0 ? R.seq : revcomp(R.seq)}; return PLUS.s; }
+const pj = i => R.strand > 0 ? i : R.seq.length - 1 - i;   // transcript-oriented index → plus-strand index
+const gp = j => R.gStart + j;                                // plus index → GRCh38 position
+const oriented = s => R.strand > 0 ? s : revcomp(s);
+
+/* HGVS g. (3′-shifted on the plus strand) + VCF (left-aligned), computed locally */
+function genomicOf(v) {
+  const P = plusSeq(), acc = R.chrAcc, chr = R.chr;
+  if (v.kind === 'snv') { const j = pj(v.s), ref = oriented(v.ref), alt = oriented(v.alt); return {g: `${acc}:g.${gp(j)}${ref}>${alt}`, vcf: {chr, pos: gp(j), ref, alt}, pos: gp(j), len: 1}; }
+  if (v.kind === 'del' || v.kind === 'delins') {
+    let a = Math.min(pj(v.s), pj(v.e)), b = Math.max(pj(v.s), pj(v.e));
+    if (v.kind === 'delins') { const X = oriented(v.alt); const g = a === b ? `${gp(a)}` : `${gp(a)}_${gp(b)}`; return {g: `${acc}:g.${g}delins${X}`, vcf: {chr, pos: gp(a), ref: P.slice(a, b + 1), alt: X}, pos: gp(a), len: b - a + 1}; }
+    let a3 = a, b3 = b; while (b3 + 1 < P.length && P[b3 + 1] === P[a3]) { a3++; b3++; }
+    let a5 = a, b5 = b; while (a5 - 1 > 0 && P[a5 - 1] === P[b5]) { a5--; b5--; }
+    const g = a3 === b3 ? `${gp(a3)}` : `${gp(a3)}_${gp(b3)}`;
+    return {g: `${acc}:g.${g}del`, vcf: {chr, pos: gp(a5 - 1), ref: P.slice(a5 - 1, b5 + 1), alt: P[a5 - 1]}, pos: gp(a5), len: b3 - a5 + 1};
+  }
+  // ins / dup: inserted sequence placed after transcript index p
+  const pT = v.kind === 'dup' ? v.e : v.s;
+  let j = R.strand > 0 ? pj(pT) : pj(pT + 1), X = oriented(v.alt);   // insertion after plus index j
+  let jl = j, Xl = X; while (jl > 0 && P[jl] === Xl[Xl.length - 1]) { Xl = Xl[Xl.length - 1] + Xl.slice(0, -1); jl--; }
+  let jr = j, Xr = X; while (jr + 1 < P.length && P[jr + 1] === Xr[0]) { Xr = Xr.slice(1) + Xr[0]; jr++; }
+  const n = Xr.length;
+  const g = (jr - n + 1 >= 0 && P.slice(jr - n + 1, jr + 1) === Xr) ? `${acc}:g.${n === 1 ? gp(jr) : `${gp(jr - n + 1)}_${gp(jr)}`}dup` : `${acc}:g.${gp(jr)}_${gp(jr + 1)}ins${Xr}`;
+  return {g, vcf: {chr, pos: gp(jl), ref: P[jl], alt: P[jl] + Xl}, pos: gp(jl), len: jr - jl + 1};
+}
+
+/* ---- VariantValidator: many variants per call ---- */
+async function vvBatch(list) {
+  for (let k = 0; k < list.length; k += 10) {
+    const chunk = list.slice(k, k + 10);
+    const desc = chunk.map(x => `${R.tx}:${x.v.hgvs}`).join('|');
+    try {
+      const d = await serial('vv', 1000, () => fetchRetry(`https://rest.variantvalidator.org/VariantValidator/variantvalidator/GRCh38/${encodeURIComponent(desc)}/${encodeURIComponent(R.tx)}?content-type=application%2Fjson`, {}, 'json', 3));
+      const entries = Object.entries(d).filter(([key]) => key !== 'flag' && key !== 'metadata').map(([, e]) => e);
+      for (const x of chunk) {
+        const e = entries.find(e => (e.submitted_variant || '').replace(/\s/g, '') === `${R.tx}:${x.v.hgvs}`) || (entries.length === 1 && chunk.length === 1 ? entries[0] : null);
+        if (!e) { x.a.err.push('VariantValidator: no result'); continue; }
+        if (!e.hgvs_transcript_variant) { x.a.err.push('VariantValidator: ' + (e.validation_warnings || ['invalid']).join(' | ')); continue; }
+        const g38 = (e.primary_assembly_loci || {}).grch38 || {}, p = (e.hgvs_predicted_protein_consequence || {}).tlr || '';
+        x.a.vv = {c: e.hgvs_transcript_variant.split(':').pop(), p: p.includes(':') ? p.split(':').pop() : p, g: g38.hgvs_genomic_description || '', vcf: g38.vcf || null, warn: (e.validation_warnings || []).filter(w => !/LRG/.test(w))};
+      }
+    } catch (err) { chunk.forEach(x => x.a.err.push('VariantValidator: ' + err.message)); }
+    refreshVars();
+  }
+}
+
+/* ---- ClinVar: one OR-ed position search + one summary call for all variants ---- */
+const STARS = {'practice guideline': 4, 'reviewed by expert panel': 3, 'criteria provided, multiple submitters, no conflicts': 2, 'criteria provided, single submitter': 1, 'criteria provided, conflicting classifications': 1, 'criteria provided, conflicting interpretations': 1};
+function cvParse(rec) {
+  const gc = rec.germline_classification || {};
+  const rs = (rec.variation_set || []).flatMap(s => s.variation_xrefs || []).find(x => x.db_source === 'dbSNP');
+  return {uid: rec.uid, acc: rec.accession, title: rec.title, cls: gc.description || 'not provided', review: gc.review_status || '', stars: STARS[gc.review_status] ?? 0, traits: (gc.trait_set || []).map(t => t.trait_name).filter(Boolean).slice(0, 3), rs: rs ? 'rs' + rs.db_id : ''};
+}
+async function cvSummaries(ids) {
+  const out = [];
+  for (let k = 0; k < ids.length; k += 150) { const d = await ncbi(`${EU}/esummary.fcgi?db=clinvar&retmode=json&id=${ids.slice(k, k + 150).join(',')}`); out.push(...(d.result?.uids || []).map(u => d.result[u])); }
+  return out;
+}
+const recPos = rec => { for (const s of rec.variation_set || []) for (const l of s.variation_loc || []) if (l.assembly_name === 'GRCh38' && l.status === 'current') return [+l.start, +l.stop]; return null; };
+async function clinvarBatch(list) {
+  const txBase = R.tx.split('.')[0];
+  const accOf = name => (name || '').split('(')[0].split(':')[0].split('.')[0];
+  const has = (rec, c) => (rec.variation_set || []).some(s => s.cdna_change === c && accOf(s.variation_name) === txBase);
+  const single = rec => (rec.variation_set || []).length === 1;
+  try {
+    let recs = [];
+    for (let k = 0; k < list.length; k += 25) {
+      const term = list.slice(k, k + 25).map(x => `(${R.chr}[chr] AND ${x.loc.pos}:${x.loc.pos + Math.max(0, x.loc.len - 1)}[chrpos38])`).join(' OR ');
+      const s = await ncbi(`${EU}/esearch.fcgi?db=clinvar&retmode=json&retmax=1000&term=${encodeURIComponent(term)}`);
+      recs = recs.concat(await cvSummaries(s.esearchresult?.idlist || []));
+    }
+    const fallback = [];
+    for (const x of list) {
+      const c = x.v.hgvs, lo = x.loc.pos, hi = x.loc.pos + Math.max(0, x.loc.len - 1);
+      const atPos = recs.filter(r => { const p = recPos(r); return p && p[1] >= lo && p[0] <= hi; });
+      const exact = recs.find(r => single(r) && has(r, c));
+      const hap = recs.filter(r => !single(r) && has(r, c));
+      x.a.cv = {exact: exact ? cvParse(exact) : null, hap: hap.map(cvParse), near: atPos.filter(r => r !== exact && !hap.includes(r)).map(cvParse)};
+      if (!exact && x.v.kind !== 'snv') fallback.push(x);   // indels: ClinVar may anchor them differently → text search
+    }
+    refreshVars();
+    for (const x of fallback) {
+      const s = await ncbi(`${EU}/esearch.fcgi?db=clinvar&retmode=json&retmax=50&term=${encodeURIComponent(R.tx + ':' + x.v.hgvs)}`);
+      const rr = await cvSummaries(s.esearchresult?.idlist || []);
+      const exact = rr.find(r => single(r) && has(r, x.v.hgvs)); if (exact) x.a.cv.exact = cvParse(exact);
+      x.a.cv.hap = x.a.cv.hap.concat(rr.filter(r => !single(r) && has(r, x.v.hgvs) && !x.a.cv.hap.some(h => h.uid === r.uid)).map(cvParse));
+      refreshVars();
+    }
+  } catch (err) { list.forEach(x => { if (!x.a.cv) x.a.err.push('ClinVar: ' + err.message); }); }
+}
+
+/* ---- gnomAD v4: all variants in one GraphQL request (aliases) ---- */
+async function gnomadBatch(list) {
+  for (let k = 0; k < list.length; k += 30) {
+    const chunk = list.slice(k, k + 30);
+    const q = '{' + chunk.map((x, n) => { const id = `${x.loc.vcf.chr}-${x.loc.vcf.pos}-${x.loc.vcf.ref}-${x.loc.vcf.alt}`; x.gid = id; return `v${n}: variant(variantId:"${id}", dataset: gnomad_r4){variant_id rsids exome{ac an homozygote_count} genome{ac an homozygote_count}}`; }).join(' ') + '}';
+    try {
+      const d = await serial('gn', 1000, () => fetchRetry('https://gnomad.broadinstitute.org/api', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({query: q})}, 'json', 3));
+      if (!d.data) throw new Error((d.errors || [{message: 'no data'}])[0].message);
+      chunk.forEach((x, n) => {
+        const v = d.data['v' + n];
+        if (!v) { x.a.gn = {found: false, id: x.gid}; return; }
+        const ac = (v.exome?.ac || 0) + (v.genome?.ac || 0), an = (v.exome?.an || 0) + (v.genome?.an || 0), hom = (v.exome?.homozygote_count || 0) + (v.genome?.homozygote_count || 0);
+        x.a.gn = {found: true, id: x.gid, ac, an, af: an ? ac / an : 0, hom, rs: (v.rsids || [])[0] || ''};
+      });
+    } catch (err) { chunk.forEach(x => x.a.err.push('gnomAD: ' + err.message)); }
+    refreshVars();
+  }
+}
+
+/* ---- MobiDetails: look up by genomic HGVS; create with the user's key if missing ---- */
+const num = x => (x == null || x === '' || isNaN(+x)) ? null : +x;
+function mdParse(d) {
+  const mp = d.missensePredictions || {}, sp = d.splicingPredictions || {}, op = d.overallPredictions || {}, fq = d.frequenciesDatabases || {}, ps = d.positions || {}, gn = d.gene || {};
+  const sai = {AG: num(sp.spliceai_DS_AG), AL: num(sp.spliceai_DS_AL), DG: num(sp.spliceai_DS_DG), DL: num(sp.spliceai_DS_DL)};
+  const saiVals = Object.values(sai).filter(x => x != null);
+  return {
+    id: d.variantId, url: `${MD}/api/variant/${d.variantId}/browser/`,
+    revel: num(mp.revelScore), revelPred: mp.revelPred, am: num(mp.amScore), amPred: mp.amPred, cadd: num(op.caddPhred),
+    sai: saiVals.length ? Math.max(...saiVals) : null, saiD: sai, spip: sp.SPiP && typeof sp.SPiP === 'object' ? sp.SPiP : null,
+    missense: [['REVEL', mp.revelScore, mp.revelPred], ['AlphaMissense', mp.amScore, mp.amPred], ['BayesDel', mp.bayesDelScore, mp.bayesDelPred], ['ClinPred', mp.clinpredScore, mp.clinpredPred], ['MetaLR', mp.metaLRScore, mp.metaLRPred], ['MISTIC', mp.misticScore, mp.misticPred], ['PolyPhen-2 HVAR', mp.polyphen2HvarScore, mp.polyphen2HvarPred], ['SIFT', mp.siftScore, mp.siftPred], ['FATHMM-XF', mp.fathmmxfScore, mp.fathmmxfPred], ['PROVEAN', mp.proveanScore, mp.proveanPred], ['popEVE', mp.popeveScore, mp.popevePred]].filter(r => r[1] != null && r[1] !== 'None'),
+    splicing: [['SpliceAI Δ acceptor gain', sp.spliceai_DS_AG, sp.spliceai_DP_AG], ['SpliceAI Δ acceptor loss', sp.spliceai_DS_AL, sp.spliceai_DP_AL], ['SpliceAI Δ donor gain', sp.spliceai_DS_DG, sp.spliceai_DP_DG], ['SpliceAI Δ donor loss', sp.spliceai_DS_DL, sp.spliceai_DP_DL], ['dbscSNV ADA', sp.dbscSNVADA], ['dbscSNV RF', sp.dbscSNVRF]].filter(r => r[1] != null && r[1] !== 'None'),
+    overall: [['CADD phred', op.caddPhred], ['Eigen phred', op.eigenPhred], ['phyloP primates', op.phylop_primates], ['Cactus 241-way', op.cactus241way], ['MPA', op.mpaScore != null ? `${op.mpaScore} (${op.mpaImpact})` : null]].filter(r => r[1] != null && r[1] !== 'None'),
+    context: [['Protein domain', Array.isArray(ps.proteinDomain) ? ps.proteinDomain.map(x => x[0]).join('; ') : ps.proteinDomain], ['Nearest splice site', ps.nearestSsDist != null ? `${ps.nearestSsDist} bp (${ps.nearestSsType})` : null], ['MetaDome tolerance', ps.metaDomeTolerance], ['ClinGen VCEP spec', gn.clingenCriteriaSpec], ['gnomAD v4 exome (MD)', fq.gnomADv4Exome], ['gnomAD v4 genome (MD)', fq.gnomADv4Genome], ['ClinVar (MD copy)', fq.clinvarClinsig ? `${fq.clinvarClinsig} ${fq.clinvarClinRevStat || ''}` : null]].filter(r => r[1] != null && r[1] !== 'None' && r[1] !== '')
+  };
+}
+async function mdOne(x) {
+  try {
+    const ex = await serial('mdq', 250, () => fetchRetry(`${MD}/api/variant/exists/${encodeURIComponent(x.loc.g)}`, {}, 'json', 3));
+    let id = ex.mobidetails_id;
+    if (!id && ST.mdKey) {
+      const body = new URLSearchParams({variant_chgvs: encodeURIComponent(`${R.tx}:${x.v.hgvs}`), caller: 'cli'});
+      const cr = await serial('mdc', 1500, () => fetchRetry(`${MD}/api/variant/create`, {method: 'POST', headers: {'Authorization': 'Bearer ' + ST.mdKey}, body}, 'json', 2));
+      if (cr.mobidetails_error) throw new Error(cr.mobidetails_error);
+      id = cr.mobidetails_id;
+    }
+    if (!id) { x.a.md = {absent: true}; return; }
+    const d = await serial('mdq', 250, () => fetchRetry(`${MD}/api/variant/${id}/cli/`, {}, 'json', 3));
+    if (d.mobidetails_error) throw new Error(d.mobidetails_error);
+    x.a.md = mdParse(d);
+  } catch (err) { x.a.err.push('MobiDetails: ' + err.message); }
+  finally { refreshVars(); }
+}
+async function mdBatch(list) {   // 3 variants in flight at a time
+  const q = list.slice(); const worker = async () => { while (q.length) await mdOne(q.shift()); };
+  await Promise.all([worker(), worker(), worker()]);
+}
+
+/* ---- orchestration ---- */
+const annKey = v => `ssv-ann2-${v.key}`;
+let annTimer = null; const PENDING = new Set();
+function annotate(key, force = false) {
+  if (!force && ANN.has(key)) return;
+  if (force) { try { localStorage.removeItem('ssv-ann2-' + key); } catch (e) {} }
+  ANN.set(key, {st: 'run', vv: null, cv: null, gn: null, md: null, err: []});
+  PENDING.add(key); clearTimeout(annTimer); annTimer = setTimeout(flushAnnot, 200);
+  refreshVars();
+}
+async function flushAnnot() {
+  const tx = R.tx, list = [];
+  for (const key of PENDING) {
+    const v = VARS.find(x => x.key === key), a = ANN.get(key); if (!v || !a) continue;
+    const c = recall(annKey(v));
+    if (c && Date.now() - c.t < ANN_TTL) { Object.assign(a, c.a, {st: 'done', cachedAt: c.t, err: []}); continue; }
+    list.push({v, a, loc: genomicOf(v)});
+  }
+  PENDING.clear(); refreshVars();
+  if (!list.length) return;
+  await Promise.allSettled([vvBatch(list), clinvarBatch(list), gnomadBatch(list), mdBatch(list)]);
+  if (R.tx !== tx) return;
+  for (const x of list) {
+    x.a.st = 'done'; x.a.g = x.loc.g;
+    if (!x.a.err.length) store(annKey(x.v), {t: Date.now(), a: {vv: x.a.vv, cv: x.a.cv, gn: x.a.gn, md: x.a.md, g: x.loc.g}});
+  }
+  refreshVars();
+}
+
+/* =====================================================================
+   8. Rendering
+   ===================================================================== */
+let rafP = false;
+function refresh() { if (rafP) return; rafP = true; requestAnimationFrame(() => { rafP = false; computeVariants(); renderReads(); renderCoverage(); renderVariants(); renderAlignment(); renderFlags(); renderSummary(); }); }
+let rafV = false;
+function refreshVars() { if (rafV) return; rafV = true; requestAnimationFrame(() => { rafV = false; renderVariants(); renderSummary(); }); }
+
+function ampOf(r) {
+  const x = r.res; if (!x || x.status !== 'ok') return null; let best = null, bo = 0;
+  for (const a of AMPS) if (a.ok) { const o = Math.min(x.re, a.e) - Math.max(x.rs, a.s); if (o > bo) { bo = o; best = a; } }
+  return best;
+}
+function nameHint(r) {
+  const okA = AMPS.filter(a => a.ok); if (!okA.length) return null;
+  const nm = ' ' + r.name.toUpperCase().replace(/\.[A-Z0-9]+$/, '').replace(/[^A-Z0-9]+/g, ' ') + ' ';
+  const hits = okA.filter(a => { const b = a.name.toUpperCase().replace(new RegExp('^' + R.symbol + '[^A-Z0-9]*'), '').replace(/[^A-Z0-9]+/g, ''); return b && new RegExp(`[^A-Z0-9]${b}(F|R|FW|REV|FWD)?[^A-Z0-9]`).test(nm.replace(/(\d)\s+(F|R)\s/g, '$1$2 ')); });
+  return hits.length === 1 ? hits[0] : null;
+}
+function renderReads() {
+  const el = $('#readsList');
+  $('#readCount').textContent = READS.length ? `${READS.length} read${READS.length > 1 ? 's' : ''}` : '';
+  if (!READS.length) { el.innerHTML = ''; return; }
+  el.innerHTML = READS.map(r => {
+    const x = r.res; let dir = '…', cls = 'dirX', meta = [];
+    meta.push(r.ab ? `AB1 · ${r.ab.base.length} bp` : `text · ${r.seq.length} bp`);
+    if (!R) meta.push('waiting for a gene');
+    else if (!x) meta.push('—');
+    else if (x.status === 'ok') {
+      dir = x.rev ? 'R ←' : 'F →'; cls = x.rev ? 'dirR' : 'dirF';
+      if (r.ab && ST.trim) meta.push(`trim ${x.ts + 1}–${x.te + 1}`);
+      meta.push(`<span class="mono">${cRange(x.rs, x.re)}</span>`, `${(x.ident * 100).toFixed(1)}% id`);
+      const a = ampOf(r); if (a) meta.push(`amplicon <b>${esc(a.name)}</b>`);
+      const nv = x.events.length; meta.push(`${nv} diff${nv === 1 ? '' : 's'}`);
+    } else { dir = '✗'; meta.push(`<span class="fl r">${x.status === 'short' ? 'too short after trimming' : x.status === 'nomatch' ? 'does not match ' + esc(R.symbol) : x.re - x.rs + 1 < 30 ? `only ${Math.max(0, x.re - x.rs + 1)} bp match ${esc(R.symbol)}` : 'low identity — check gene/sample'}</span>`); }
+    return `<div class="rd ${r.on ? '' : 'off'}"><span class="dir ${cls}">${dir}</span><div><div class="nm">${esc(r.name)}</div><div class="meta">${meta.join(' · ')}</div></div>
+      <div class="acts"><button class="btn sm ghost" data-act="go" data-id="${r.id}" title="Show in alignment">View</button><button class="btn sm ghost" data-act="copy" data-id="${r.id}" title="Copy the read oriented to the gene (trimmed)">Copy</button><button class="btn sm ghost" data-act="fa" data-id="${r.id}" title="Copy raw basecalls as FASTA">FASTA</button><button class="btn sm ghost" data-act="tog" data-id="${r.id}">${r.on ? 'Exclude' : 'Include'}</button><button class="btn sm ghost" data-act="del" data-id="${r.id}" title="Remove">✕</button></div></div>`;
+  }).join('');
+}
+
+/* ---------- coverage map ---------- */
+let LAYOUT = null;
+function buildLayout(W) {
+  const segs = [], E = R.exons;
+  const push = (s, e, kind, ex) => { if (e >= s) segs.push({s, e, kind, ex}); };
+  push(0, E[0].s - 1, 'flank');
+  E.forEach((x, k) => {
+    let a = x.s, cur = null;
+    for (let i = x.s; i <= x.e + 1; i++) { const kd = i > x.e ? null : (isCoding(i) ? 'cds' : 'utr'); if (kd !== cur) { if (cur) push(a, i - 1, cur, x.n); a = i; cur = kd; } }
+    if (k < E.length - 1) push(x.e + 1, E[k + 1].s - 1, 'intron', x.n);
+  });
+  push(E[E.length - 1].e + 1, R.seq.length - 1, 'flank');
+  const comp = segs.filter(s => s.kind !== 'cds');
+  const cap = Math.max(10, Math.min(48, (0.42 * W) / Math.max(1, comp.length)));
+  let used = 0;
+  for (const s of comp) { const len = s.e - s.s + 1; s.w = Math.min(cap, Math.max(6, 4 + Math.log10(len + 1) * 9)); if (s.kind === 'utr') s.w = Math.min(s.w, Math.max(4, len * 0.6)); used += s.w; }
+  const cds = segs.filter(s => s.kind === 'cds'), totC = cds.reduce((a, s) => a + s.e - s.s + 1, 0);
+  const avail = Math.max(W - used, W * 0.3);
+  for (const s of cds) s.w = Math.max(3, (s.e - s.s + 1) / totC * avail);
+  const sum = segs.reduce((a, s) => a + s.w, 0), k = W / sum; let x = 0;
+  for (const s of segs) { s.w *= k; s.x = x; x += s.w; s.comp = s.kind !== 'cds' && (s.e - s.s + 1) * (avail * k / totC) > s.w * 1.5; }
+  return segs;
+}
+function xOf(i) { const S = LAYOUT; let lo = 0, hi = S.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S[m].s <= i) lo = m; else hi = m - 1; } const s = S[lo]; return s.x + (Math.min(Math.max(i, s.s), s.e + 1) - s.s) / (s.e - s.s + 1) * s.w; }
+function idxOfX(x) { const S = LAYOUT; const s = S.find(z => x >= z.x && x <= z.x + z.w) || S[S.length - 1]; return Math.round(s.s + (x - s.x) / s.w * (s.e - s.s)); }
+function lanes(items) { const ends = []; return items.map(it => { let l = ends.findIndex(e => e < it.s - 2); if (l < 0) { l = ends.length; ends.push(0); } ends[l] = it.e; return l; }); }
+const CLS_COLOR = {P: 'var(--red)', LP: 'var(--orange)', VUS: 'var(--yellow)', LB: 'var(--green)', B: 'var(--green)'};
+function renderCoverage() {
+  const svg = $('#covSvg');
+  if (!R) { svg.setAttribute('viewBox', '0 0 1200 40'); svg.innerHTML = `<text x="16" y="24">Load a gene to see the coverage map.</text>`; $('#covStats').innerHTML = ''; $('#exonChips').innerHTML = ''; $('#covGaps').innerHTML = ''; return; }
+  const W = 1200, PADX = 10, IW = W - 2 * PADX; LAYOUT = buildLayout(IW); const X = i => PADX + xOf(i);
+  const cov = coverageArrays(), reads = goodReads();
+  const okA = AMPS.filter(a => a.ok);
+  let y = 0, h = '';
+  // exon labels + gene model
+  const gy = 30;
+  h += `<line x1="${PADX}" x2="${W - PADX}" y1="${gy + 10}" y2="${gy + 10}" stroke="var(--muted)" stroke-width="1"/>`;
+  for (const s of LAYOUT) {
+    const x = PADX + s.x;
+    if (s.kind === 'cds') h += `<rect x="${x}" y="${gy}" width="${Math.max(1, s.w)}" height="20" rx="2" fill="var(--accent)"><title>Exon ${s.ex} coding: ${cRange(s.s, s.e)}</title></rect>`;
+    else if (s.kind === 'utr') h += `<rect x="${x}" y="${gy + 5}" width="${Math.max(1, s.w)}" height="10" rx="2" fill="var(--muted)" opacity=".55"><title>Exon ${s.ex} UTR: ${cRange(s.s, s.e)} (${s.e - s.s + 1} bp)</title></rect>`;
+    else if (s.comp) h += `<text x="${x + s.w / 2}" y="${gy + 14}" text-anchor="middle" style="font-size:9px">//</text><title>${s.kind} ${s.e - s.s + 1} bp</title>`;
+  }
+  for (const e of R.exons) { const x = (X(e.s) + X(e.e + 1)) / 2; h += `<text class="exn" x="${x}" y="${gy - 6}" text-anchor="middle">${e.n}</text>`; }
+  // variant markers
+  for (const v of VARS) { const u = UCLS.get(v.key) || {}; if (u.cls === 'ART') continue; const x = X(v.s); h += `<path d="M${x - 5} ${gy - 22} L${x + 5} ${gy - 22} L${x} ${gy - 14} Z" fill="${CLS_COLOR[u.cls] || 'var(--ink)'}"><title>${esc(v.hgvs)} ${esc(v.p || '')} (${v.zyg})</title></path>`; }
+  y = gy + 30;
+  // depth strip
+  h += `<text x="${PADX}" y="${y + 8}">depth</text>`; y += 12;
+  let runS = 0, runK = -2;
+  const kindAt = i => { const t = (cov.f[i] > 0) + (cov.rv[i] > 0) * 2; if (t === 3) return 2; if (t) return 1; return isCoding(i) ? 0 : -1; };
+  const col = {0: 'var(--red)', 1: 'var(--orange)', 2: 'var(--green)'};
+  for (let i = 0; i <= R.seq.length; i++) { const k = i < R.seq.length ? kindAt(i) : -3; if (k !== runK) { if (runK >= 0) { const x1 = X(runS), x2 = X(i); h += `<rect x="${x1}" y="${y}" width="${Math.max(1, x2 - x1)}" height="8" fill="${col[runK]}"><title>${runK === 0 ? 'Coding, not covered' : runK === 1 ? 'One direction only' : 'Forward + reverse'}: ${cRange(runS, i - 1)}</title></rect>`; } runS = i; runK = k; } }
+  y += 16;
+  // amplicons
+  if (okA.length) {
+    h += `<text x="${PADX}" y="${y + 9}">primers / amplicons</text>`; y += 13;
+    const L = lanes(okA.slice().sort((a, b) => a.s - b.s).map(a => ({s: a.s, e: a.e}))), sorted = okA.slice().sort((a, b) => a.s - b.s);
+    sorted.forEach((a, k) => { const yy = y + L[k] * 16, x1 = X(a.s), x2 = X(a.e + 1); h += `<g><rect x="${x1}" y="${yy}" width="${Math.max(2, x2 - x1)}" height="11" rx="3" fill="var(--orange)" opacity=".28"/><rect x="${x1}" y="${yy}" width="${Math.max(1.5, X(a.ins[0]) - x1)}" height="11" fill="var(--orange)"/><rect x="${X(a.ins[1] + 1)}" y="${yy}" width="${Math.max(1.5, x2 - X(a.ins[1] + 1))}" height="11" fill="var(--orange)"/><text x="${x1 + 3}" y="${yy + 9}" style="fill:var(--ink);font-weight:700">${esc(a.name)}</text><title>${esc(a.name)} · ${a.size} bp · insert ${cRange(a.ins[0], a.ins[1])}</title></g>`; });
+    y += (Math.max(...L) + 1) * 16 + 4;
+  }
+  // reads
+  if (reads.length) {
+    h += `<text x="${PADX}" y="${y + 9}">reads (→ forward, ← reverse)</text>`; y += 13;
+    const sr = reads.slice().sort((a, b) => a.res.rs - b.res.rs), L = lanes(sr.map(r => ({s: r.res.rs, e: r.res.re})));
+    sr.forEach((r, k) => { const x = r.res, yy = y + L[k] * 17, x1 = X(x.rs), x2 = X(x.re + 1), c = x.rev ? 'var(--orange)' : 'var(--accent)';
+      h += `<g data-read="${r.id}" style="cursor:pointer"><rect x="${x1}" y="${yy}" width="${Math.max(2, x2 - x1)}" height="12" rx="3" fill="${c}"/>`;
+      for (const [a, b] of x.mixRef) h += `<rect x="${X(a)}" y="${yy}" width="${Math.max(1.5, X(b + 1) - X(a))}" height="12" fill="var(--red)" opacity=".55"/>`;
+      for (const m of x.mixInfo) if (m.shift) { const mx = X(m.start); h += `<path d="M${mx} ${yy - 3} L${mx} ${yy + 15}" stroke="var(--red)" stroke-width="2.5"/><text x="${mx + (x.rev ? -4 : 4)}" y="${yy - 2}" text-anchor="${x.rev ? 'end' : 'start'}" style="fill:var(--red);font-weight:700">het indel?</text>`; }
+      h += `<text x="${x1 + 4}" y="${yy + 9.5}" style="fill:#fff;font-weight:700">${esc(r.name)} ${x.rev ? '←' : '→'}</text><title>${esc(r.name)}: ${cRange(x.rs, x.re)} · ${(x.ident * 100).toFixed(1)}% identity</title></g>`; });
+    y += (Math.max(...L) + 1) * 17 + 4;
+  }
+  y += 6;
+  svg.setAttribute('viewBox', `0 0 ${W} ${y}`); svg.style.height = 'auto'; svg.innerHTML = h;
+  // stats
+  const C = R.coding, n = C.length; let c1 = 0, c2 = 0, ca = 0;
+  const ampMask = new Uint8Array(R.seq.length); for (const a of okA) for (let i = a.ins[0]; i <= a.ins[1]; i++) ampMask[i] = 1;
+  for (let k = 0; k < n; k++) { const i = C[k]; if (cov.f[i] || cov.rv[i]) c1++; if (cov.f[i] && cov.rv[i]) c2++; if (ampMask[i]) ca++; }
+  const pc = v => (v / n * 100).toFixed(v === n ? 0 : 1) + '%';
+  R.covStat = {n, c1, c2, ca};
+  $('#covStats').innerHTML = `<div class="stat"><div class="v">${pc(c1)}</div><div class="l">CDS covered ≥1 read</div></div><div class="stat"><div class="v">${pc(c2)}</div><div class="l">CDS forward + reverse</div></div>` +
+    (okA.length ? `<div class="stat"><div class="v">${pc(ca)}</div><div class="l">CDS inside primer design</div></div>` : '') +
+    `<div class="stat"><div class="v">${n - c1}</div><div class="l">coding bp missing</div></div>`;
+  // exon chips
+  $('#exonChips').innerHTML = R.exons.map(e => {
+    let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; }
+    if (!nc) return '';
+    const cl = k1 === nc ? 'full' : k1 ? 'part' : 'none';
+    return `<span class="ex ${cl}" data-idx="${e.s}" title="Exon ${e.n}: ${nc} coding bp · ${k1} covered · ${k2} both directions">Ex${e.n} ${Math.round(k1 / nc * 100)}%${k2 && k2 < nc ? ` <span style="opacity:.7">(F+R ${Math.round(k2 / nc * 100)}%)</span>` : k2 === nc ? ' F+R' : ''}</span>`;
+  }).join('');
+  // gaps
+  const gaps = []; let gs = -1;
+  for (let k = 0; k <= n; k++) { const un = k < n && !(cov.f[C[k]] || cov.rv[C[k]]); if (un && gs < 0) gs = k; if (!un && gs >= 0) { gaps.push([C[gs], C[k - 1], k - gs]); gs = -1; } }
+  $('#covGaps').innerHTML = !reads.length ? '<span class="muted">Add reads to measure coverage.</span>' : gaps.length ? `<b>Coding gaps:</b> ${gaps.slice(0, 14).map(([a, b, l]) => `<span class="mono">${cRange(a, b)}</span> <span class="muted">(${l} bp)</span>`).join(' · ')}${gaps.length > 14 ? ` · +${gaps.length - 14} more` : ''}` : '<b style="color:var(--green)">Entire CDS covered.</b>';
+}
+
+/* ---------- variants table ---------- */
+const CLS_OPTS = [['', 'Not classified'], ['P', 'Pathogenic'], ['LP', 'Likely pathogenic'], ['VUS', 'VUS'], ['LB', 'Likely benign'], ['B', 'Benign'], ['ART', 'Artefact (exclude)']];
+const CLS_NAME = Object.fromEntries(CLS_OPTS);
+function cvClassChip(cls) { const c = /pathogenic/i.test(cls) && !/conflict/i.test(cls) ? (/likely/i.test(cls) ? 'c-LP' : 'c-P') : /benign/i.test(cls) && !/conflict/i.test(cls) ? (/likely/i.test(cls) ? 'c-LB' : 'c-B') : /uncertain/i.test(cls) ? 'c-VUS' : 'c-N'; return `<span class="chip ${c}">${esc(cls)}</span>`; }
+function fmtAF(af) { if (af === 0) return '0'; if (af >= 0.01) return (af * 100).toFixed(2) + '%'; return af.toExponential(2); }
+function annotCells(v) {
+  const a = ANN.get(v.key);
+  if (!a) return [`<button class="btn sm ghost" data-ann="${esc(v.key)}">Annotate</button>`, '', ''];
+  const run = a.st === 'run';
+  let cv = '';
+  if (a.cv?.exact) { const x = a.cv.exact; cv = `${cvClassChip(x.cls)} <span title="${esc(x.review)}">${'★'.repeat(x.stars)}${'☆'.repeat(4 - x.stars)}</span><br><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/${x.uid}/" target="_blank" rel="noopener">${esc(x.acc || 'VCV')}</a>${x.rs ? ` · <a href="https://www.ncbi.nlm.nih.gov/snp/${x.rs}" target="_blank" rel="noopener">${x.rs}</a>` : ''}${x.traits.length ? `<div class="vvn" style="font-family:var(--sans)">${esc(x.traits.join('; '))}</div>` : ''}`; }
+  else if (a.cv) cv = `<span class="muted">Not in ClinVar</span>${a.cv.near.length ? `<br><span class="small muted" title="${esc(a.cv.near.map(n => n.title + ' — ' + n.cls).join('\n'))}">${a.cv.near.length} other record${a.cv.near.length > 1 ? 's' : ''} at this position ⓘ</span>` : ''}`;
+  else if (run) cv = '<span class="spin"></span>';
+  else cv = '<span class="muted">—</span>';
+  if (a.cv?.hap?.length) cv += `<div class="small muted" title="${esc(a.cv.hap.map(n => n.title + ' — ' + n.cls).join('\n'))}">also in ${a.cv.hap.length} haplotype record${a.cv.hap.length > 1 ? 's' : ''} ⓘ</div>`;
+  let gn = '';
+  if (a.gn?.found) gn = `<a href="https://gnomad.broadinstitute.org/variant/${a.gn.id}?dataset=gnomad_r4" target="_blank" rel="noopener" class="mono">${fmtAF(a.gn.af)}</a><div class="small muted">${a.gn.ac}/${a.gn.an.toLocaleString()}${a.gn.hom ? ` · ${a.gn.hom} hom` : ''}</div>`;
+  else if (a.gn) gn = `<a href="https://gnomad.broadinstitute.org/variant/${a.gn.id}?dataset=gnomad_r4" target="_blank" rel="noopener">absent</a>`;
+  else if (run) gn = '<span class="spin"></span>';
+  else gn = '<span class="muted">—</span>';
+  if (a.err.length) cv += `<div class="small" style="color:var(--red)" title="${esc(a.err.join('\n'))}">⚠ ${esc(a.err.map(e => e.split(':')[0]).join(', '))} failed · <a href="#" data-retry="${esc(v.key)}">retry</a></div>`;
+  else if (a.cachedAt) cv += `<div class="small muted">cached ${Math.max(0, Math.round((Date.now() - a.cachedAt) / 864e5))} d ago · <a href="#" data-retry="${esc(v.key)}">refresh</a></div>`;
+  return [cv, gn, mdCell(a, run)];
+}
+const PRED_CLS = p => /likely pathogenic|damaging|deleterious|disease/i.test(p || '') ? 'sc-hi' : /ambiguous|possibly|uncertain/i.test(p || '') ? 'sc-mid' : /benign|tolerated|neutral|polymorphism/i.test(p || '') ? 'sc-lo' : '';
+const SAI_CLS = x => x == null ? '' : x >= 0.5 ? 'sc-hi' : x >= 0.2 ? 'sc-mid' : 'sc-lo';
+const f2 = x => x == null ? '—' : (Math.abs(x) >= 10 ? x.toFixed(1) : x.toFixed(2));
+function mdCell(a, run) {
+  const m = a.md;
+  if (m?.id) {
+    const sc = [];
+    if (m.revel != null) sc.push(`<span class="sc ${PRED_CLS(m.revelPred)}" title="REVEL ${esc(m.revelPred || '')}">REVEL ${f2(m.revel)}</span>`);
+    if (m.am != null) sc.push(`<span class="sc ${PRED_CLS(m.amPred)}" title="AlphaMissense: ${esc(m.amPred || '')}">AM ${f2(m.am)}</span>`);
+    if (m.cadd != null) sc.push(`<span class="sc" title="CADD phred">CADD ${f2(m.cadd)}</span>`);
+    if (m.sai != null) sc.push(`<span class="sc ${SAI_CLS(m.sai)}" title="SpliceAI max Δ score (AG ${m.saiD.AG}, AL ${m.saiD.AL}, DG ${m.saiD.DG}, DL ${m.saiD.DL}). Original-paper cut-offs: 0.2 high recall · 0.5 recommended · 0.8 high precision">SpliceAI ${f2(m.sai)}</span>`);
+    const rows = (title, arr, fmt) => arr.length ? `<tr><th colspan="2">${title}</th></tr>` + arr.map(r => `<tr><td>${esc(r[0])}</td><td class="mono">${esc(fmt(r))}</td></tr>`).join('') : '';
+    const det = rows('Missense', m.missense, r => `${r[1]}${r[2] && r[2] !== 'None' ? ' · ' + r[2] : ''}`) + rows('Splicing', m.splicing, r => `${r[1]}${r[2] != null && r[2] !== 'None' ? ` (pos ${r[2]})` : ''}`) + rows('Overall / conservation', m.overall, r => String(r[1])) + rows('Context', m.context, r => String(r[1]));
+    return `<a href="${m.url}" target="_blank" rel="noopener">MD ${m.id}</a><div class="scs">${sc.join('') || '<span class="muted small">no scores</span>'}</div>${det ? `<details class="mdd"><summary>all scores</summary><table>${det}</table></details>` : ''}`;
+  }
+  if (m?.absent) return `<span class="muted">Not in MobiDetails</span><div class="small muted">${ST.mdKey ? '' : 'add your MobiDetails API key in Settings to create it automatically'}</div>`;
+  if (run) return '<span class="spin"></span>';
+  return '<span class="muted">—</span>';
+}
+function renderVariants() {
+  const tb = $('#varTable tbody');
+  $('#varEmpty').style.display = VARS.length ? 'none' : 'block';
+  const nAnn = VARS.filter(v => ANN.get(v.key)?.st === 'run').length;
+  $('#varState').innerHTML = VARS.length ? `${VARS.length} variant${VARS.length > 1 ? 's' : ''}${nAnn ? ` · <span class="spin"></span> annotating ${nAnn}` : ''}` : '';
+  tb.innerHTML = VARS.map(v => {
+    const a = ANN.get(v.key), u = UCLS.get(v.key) || {cls: '', note: ''};
+    const [cv, gn, md] = annotCells(v);
+    const vvC = a?.vv?.c, vvP = a?.vv?.p;
+    let hg = `<div class="hg">${esc(v.hgvs)}</div>`;
+    if (vvC && vvC !== v.hgvs) hg += `<div class="vvn" title="VariantValidator normalised form">VV: ${esc(vvC)}</div>`;
+    const gTxt = a?.vv?.g || a?.g; if (gTxt) hg += `<div class="vvn">${esc(gTxt)}</div>`;
+    if (a?.vv?.g && a?.g && a.vv.g !== a.g) hg += `<div class="vvn" style="color:var(--orange)" title="Local genomic normalisation differs from VariantValidator: ${esc(a.g)}">local g. differs ⓘ</div>`;
+    if (a?.vv?.warn?.length) hg += `<div class="vvn" style="color:var(--orange)" title="${esc(a.vv.warn.join('\n'))}">VV warning ⓘ</div>`;
+    const prot = vvP || v.p || '—';
+    const zyg = v.zyg === 'het' ? 'Het' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Hom/Hemi' : 'Hom') : '<span class="fl r">?</span>';
+    const reads = v.sup.map(s => `<span title="${s.q != null ? 'Q' + s.q : ''}${s.ratio ? ` · secondary/primary ${(s.ratio * 100).toFixed(0)}%` : ''}">${esc(s.r.name)}${s.r.res.rev ? '←' : '→'}${s.ratio && s.zyg === 'het' ? ` <span class="muted">${Math.round(s.ratio * 100)}%</span>` : ''}</span>`).join('<br>');
+    return `<tr class="vr ${SEL === v.key ? 'sel' : ''}" data-key="${esc(v.key)}">
+      <td>${hg}</td><td class="mono" style="white-space:nowrap">${esc(prot)}</td>
+      <td><div>${esc(v.loc)}</div><div class="small muted">${esc([v.type, v.effect].filter(Boolean).join(' · '))}</div></td>
+      <td>${zyg}</td><td class="small">${reads}</td><td class="annot">${cv}</td><td class="annot">${gn}</td><td class="annot md">${md}</td>
+      <td><div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div></td>
+      <td><select class="cls" data-cls="${esc(v.key)}">${CLS_OPTS.map(([k, l]) => `<option value="${k}" ${u.cls === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      <td><input class="note" data-note="${esc(v.key)}" value="${esc(u.note)}" placeholder="note"></td></tr>`;
+  }).join('');
+}
+
+function renderFlags() {
+  const out = [];
+  if (R) for (const g of R.gates) if (!g.ok) out.push(['r', `Reference check failed: ${g.label} — ${g.tip}`]);
+  const sigs = new Map();
+  for (const r of READS) {
+    if (!r.on || !r.res) continue; const x = r.res;
+    if (x.status === 'nomatch') out.push(['r', `${r.name}: no match to ${R.symbol}. Wrong gene selected, wrong sample, or very poor read.`]);
+    if (x.status === 'lowid') out.push(['r', x.re - x.rs + 1 < 30 ? `${r.name}: only ${Math.max(0, x.re - x.rs + 1)} bp match ${R.symbol} — wrong gene selected, wrong sample, or a very poor read.` : `${r.name}: aligns with only ${(x.ident * 100).toFixed(0)}% identity — likely poor quality or a different locus.`]);
+    if (x.status === 'short') out.push(['', `${r.name}: fewer than 30 good-quality bases after trimming.`]);
+    if (x.status !== 'ok') continue;
+    for (const m of x.mixInfo) {
+      const where = `${m.approx ? '~' : ''}c.${cLabel(m.start)}`, dirTxt = x.rev ? 'towards the 5′ end of the gene' : 'towards the 3′ end of the gene';
+      if (m.shift) out.push(['r', `${r.name}: heterozygous indel signature — from ${where} (${dirTxt}) the secondary peaks repeat the main sequence shifted by ${Math.abs(m.shift)} bp (${Math.round(m.frac * 100)}% of secondary peaks fit). Likely a heterozygous ${Math.abs(m.shift)}-bp insertion/deletion near ${where}${m.beyondTrim ? '; the read was quality-trimmed right there' : ''}. Confirm on the trace and with the opposite read; SNV calls in this stretch are suppressed.`]);
+      else out.push(['', `${r.name}: mixed/overlapping trace from ${where} — no consistent indel shift found (noise, contamination or several variants). Inspect the trace; heterozygous SNV calls in this stretch are suppressed.`]);
+    }
+    if (sigs.has(x.sig)) out.push(['', `${r.name} looks identical to ${sigs.get(x.sig)} (duplicate file?).`]); else sigs.set(x.sig, r.name);
+    const hint = nameHint(r), amp = ampOf(r);
+    if (hint && amp && hint !== amp) out.push(['r', `${r.name}: the name suggests amplicon ${hint.name}, but the read aligns to ${amp.name}. Possible tube/label swap.`]);
+    if (AMPS.some(a => a.ok) && !amp) out.push(['', `${r.name}: aligns outside every primer amplicon.`]);
+  }
+  for (const v of VARS) if (v.other.length && v.zyg === 'het') out.push(['', `${v.hgvs}: heterozygous in ${v.sup.map(s => s.r.name).join(', ')} but plain reference in ${v.other.map(o => o.r.name + (o.alt != null ? ` (alt peak ${Math.round(o.alt * 100)}% of reference)` : '')).join(', ')} — check both traces.`]);
+  $('#flags').innerHTML = out.map(([c, t]) => `<div class="fb ${c}">${esc(t)}</div>`).join('');
+}
+function renderSummary() {
+  if (!R) { $('#sumBox').innerHTML = ''; return; }
+  const inc = VARS.filter(v => (UCLS.get(v.key) || {}).cls !== 'ART');
+  const n = c => inc.filter(v => (UCLS.get(v.key) || {}).cls === c).length;
+  $('#sumBox').innerHTML = `<div class="stat"><div class="v">${R.symbol}</div><div class="l">${esc(R.tx)}</div></div><div class="stat"><div class="v">${goodReads().length}</div><div class="l">reads aligned</div></div><div class="stat"><div class="v">${inc.length}</div><div class="l">variants to export</div></div>` + ((n('P') + n('LP')) ? `<div class="stat" style="border-color:var(--red)"><div class="v" style="color:var(--red)">${n('P') + n('LP')}</div><div class="l">P / LP (your class)</div></div>` : '');
+}
+
+/* ---------- alignment viewer ---------- */
+let CHW = 7.5;
+function measureChar() { const s = document.createElement('span'); s.className = 'mono'; s.style.cssText = 'font-size:12.5px;position:absolute;visibility:hidden;white-space:pre'; s.textContent = 'ACGTACGTAC'.repeat(10); document.body.appendChild(s); CHW = s.getBoundingClientRect().width / 100 || 7.5; s.remove(); }
+function viewRegions() {
+  const L = R.seq.length, pad = 20, mode = ST.view; let regs = [];
+  if (mode === 'all') return [[0, L - 1]];
+  if (mode === 'exons') { for (const e of R.exons) { let a = -1, b = -1; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { if (a < 0) a = i; b = i; } if (a >= 0) regs.push([Math.max(0, a - 30), Math.min(L - 1, b + 30)]); } }
+  else for (const r of goodReads()) regs.push([Math.max(0, r.res.rs - pad), Math.min(L - 1, r.res.re + pad)]);
+  regs.sort((a, b) => a[0] - b[0]);
+  const m = []; for (const g of regs) { if (m.length && g[0] <= m[m.length - 1][1] + 40) m[m.length - 1][1] = Math.max(m[m.length - 1][1], g[1]); else m.push([...g]); }
+  return m;
+}
+function spansFrom(chars, classes) { let h = '', cur = null, buf = ''; for (let k = 0; k <= chars.length; k++) { const c = k < chars.length ? classes[k] : '\u0000'; if (c !== cur) { if (buf) h += cur ? `<span class="${cur}">${esc(buf)}</span>` : esc(buf); buf = ''; cur = c; } if (k < chars.length) buf += chars[k]; } return h; }
+function renderAlignment() {
+  const box = $('#aln');
+  if (!R) { box.innerHTML = '<div class="empty" style="margin:8px">Load a gene first.</div>'; return; }
+  const reads = goodReads();
+  if (ST.view === 'reads' && !reads.length) { box.innerHTML = '<div class="empty" style="margin:8px">No aligned reads yet — switch "Show" to coding exons or whole gene to browse the reference.</div>'; return; }
+  const W = ST.width, regs = viewRegions(), seq = R.seq;
+  const vpos = new Set(); for (const v of VARS) for (let i = v.s; i <= Math.max(v.s, v.e); i++) vpos.add(i);
+  const prim = new Uint8Array(seq.length); for (const a of AMPS) if (a.ok) { for (let i = a.s; i < a.ins[0]; i++) prim[i] = 1; for (let i = a.ins[1] + 1; i <= a.e; i++) prim[i] = 1; }
+  if (ST.view === 'all' && seq.length > 250000) { box.innerHTML = '<div class="empty" style="margin:8px">Gene too large for whole-gene view; use read-covered regions or coding exons.</div>'; return; }
+  const parts = []; let prevEnd = -1;
+  for (const [a0, b0] of regs) {
+    if (prevEnd >= 0 && a0 > prevEnd + 1) parts.push(`<div class="rgap">··· ${(a0 - prevEnd - 1).toLocaleString()} bp not shown (${cRange(prevEnd + 1, a0 - 1)}) ···</div>`);
+    for (let s = a0; s <= b0; s += W) {
+      const e = Math.min(b0, s + W - 1), n = e - s + 1;
+      let h = `<div class="blk" data-s="${s}" data-e="${e}">`;
+      // ruler
+      let ru = ''; for (let i = s; i <= e; i++) { const c = cLabel(i); const mm = c.match(/(-?\d+)$/); const num = /[+-]\d+$/.test(c) && /\d[+-]\d+$/.test(c) ? +c.match(/[+-](\d+)$/)[1] : (mm ? Math.abs(+mm[1]) : 0); ru += num % 10 === 0 ? '|' : num % 5 === 0 ? ':' : '·'; }
+      h += `<div class="ln ru"><span class="lab">c.${esc(cLabel(s))}</span><span class="sq" data-row="ru" data-s="${s}">${ru}</span><span class="end">c.${esc(cLabel(e))}</span></div>`;
+      // amino acids
+      let aa = '', anyAA = false; for (let i = s; i <= e; i++) { if (isCoding(i)) { const cp = R.mpos[i] - R.cdsS + 1; if (cp % 3 === 2) { aa += R.prot[(cp - 2) / 3] || ' '; anyAA = true; continue; } } aa += ' '; }
+      if (anyAA) h += `<div class="ln aa"><span class="lab">aa</span><span class="sq" data-row="aa" data-s="${s}">${esc(aa)}</span></div>`;
+      // reference
+      const rc = [], rk = [];
+      for (let i = s; i <= e; i++) {
+        const rg = R.mpos[i] ? (isCoding(i) ? 'cds' : 'utr') : 'in';
+        rc.push(rg === 'in' ? seq[i].toLowerCase() : seq[i]);
+        rk.push(['k-' + rg, prim[i] ? 'k-pr' : '', vpos.has(i) ? 'k-v' : '', i === CUR ? 'k-cur' : ''].filter(Boolean).join(' '));
+      }
+      h += `<div class="ln ref"><span class="lab">${esc(R.symbol)}</span><span class="sq" data-row="ref" data-s="${s}">${spansFrom(rc, rk)}</span></div>`;
+      // reads
+      for (const r of reads) {
+        const x = r.res; if (x.re < s || x.rs > e) continue;
+        const ch = [], kc = [];
+        for (let i = s; i <= e; i++) {
+          if (i < x.rs || i > x.re) { ch.push(' '); kc.push(''); continue; }
+          const b = x.chars[i - x.rs], rf = seq[i]; let k = '';
+          if (b === '-') k = 's-gap';
+          else if (b === 'N') k = 's-n';
+          else if (b !== rf) k = isAmb(b) ? 's-het' : 's-mm';
+          const raw = x.rawAt[i - x.rs]; if (!k && r.ab && r.ab.qual && raw >= 0 && r.ab.qual[raw] < 20) k = 's-lowq';
+          if (x.ins.has(i - 1)) k += ' s-ins';
+          if (!k.startsWith('s-') && x.mixRef.some(([a, bb]) => i >= a && i <= bb)) k += ' s-mix';
+          if (i === CUR) k += ' k-cur';
+          ch.push(ST.dots && b === rf ? '.' : b); kc.push(k.trim());
+        }
+        h += `<div class="ln rd${r.id}"><span class="lab" title="${esc(r.name)}">${esc(r.name)} ${x.rev ? '←' : '→'}</span><span class="sq" data-row="read" data-r="${r.id}" data-s="${s}">${spansFrom(ch, kc)}</span></div>`;
+      }
+      h += '</div>'; parts.push(h);
+    }
+    prevEnd = b0;
+  }
+  const st = box.scrollTop; box.innerHTML = parts.join(''); box.scrollTop = st;
+}
+function scrollToIdx(i, mark = true) {
+  if (!R) return;
+  const find = () => [...document.querySelectorAll('#aln .blk')].find(b => +b.dataset.s <= i && +b.dataset.e >= i);
+  if (mark) CUR = i;
+  renderAlignment();
+  let b = find();
+  if (!b && ST.view !== 'all' && R.seq.length <= 250000) { ST.view = 'all'; $('#viewMode').value = 'all'; saveSettings(); renderAlignment(); b = find(); }
+  if (b) { const box = $('#aln'); box.scrollTop = b.offsetTop - box.offsetTop - 30; }
+  setStatus(i, null);
+}
+function setStatus(i, r) {
+  const rg = region(i); let t = `c.${cLabel(i)} · ${rg.txt} · chr${R.chr}:${chrPos(i).toLocaleString()} · ref ${R.seq[i]}`;
+  if (isCoding(i)) { const cp = R.mpos[i] - R.cdsS + 1, cn = Math.ceil(cp / 3); t += ` · codon ${cn} ${R.cds.slice((cn - 1) * 3, cn * 3)} (${AA3[R.prot[cn - 1]] || ''}${cn})`; }
+  if (r && r.res && i >= r.res.rs && i <= r.res.re) { const x = r.res, b = x.chars[i - x.rs], raw = x.rawAt[i - x.rs]; t += ` │ ${r.name}: ${b}${isAmb(b) ? ` (${IUPAC[b].split('').join('/')})` : ''}`; if (r.ab && raw >= 0) { if (r.ab.qual) t += ` Q${r.ab.qual[raw]}`; if (x.ratio) t += ` · 2nd peak ${Math.round(x.ratio[raw] * 100)}%`; t += ' · click for trace'; } }
+  $('#status').textContent = t;
+}
+
+/* ---------- trace panel ---------- */
+const BCOL = () => { const cs = getComputedStyle(document.documentElement); return {A: cs.getPropertyValue('--bA').trim(), C: cs.getPropertyValue('--bC').trim(), G: cs.getPropertyValue('--bG').trim(), T: cs.getPropertyValue('--bT').trim()}; };
+function showTraces(i) {
+  const p = $('#tracePanel');
+  const rs = goodReads().filter(r => r.ab && readCovers(r, i) && r.res.rawAt[i - r.res.rs] >= 0);
+  if (!rs.length) { p.classList.remove('on'); toast('No AB1 trace covers this position'); return; }
+  p.classList.add('on');
+  p.innerHTML = `<div class="row" style="justify-content:space-between"><b>Traces at c.${esc(cLabel(i))} (ref ${R.seq[i]}) — shown in gene orientation</b><button class="btn sm ghost" id="trClose">Close</button></div>` +
+    rs.map(r => `<div class="tr"><div class="h"><span>${esc(r.name)} ${r.res.rev ? '← (reverse read, complemented)' : '→'}</span><span class="muted" id="trInfo${r.id}"></span></div><canvas id="trc${r.id}"></canvas></div>`).join('');
+  $('#trClose').onclick = () => p.classList.remove('on');
+  requestAnimationFrame(() => rs.forEach(r => drawTrace(r, i)));
+}
+function drawTrace(r, i) {
+  const cv = $('#trc' + r.id); if (!cv) return;
+  const x = r.res, ab = r.ab, raw = x.rawAt[i - x.rs], rev = x.rev, dpr = window.devicePixelRatio || 1;
+  const Wc = cv.clientWidth, Hc = cv.clientHeight; cv.width = Wc * dpr; cv.height = Hc * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const nb = ab.base.length, b0 = Math.max(0, raw - 10), b1 = Math.min(nb - 1, raw + 10);
+  const s0 = Math.max(0, ab.ploc[b0] - 8), s1 = Math.min(ab.scans - 1, ab.ploc[b1] + 8);
+  let mx = 1; for (const b of 'ACGT') for (let s = s0; s <= s1; s++) mx = Math.max(mx, ab.tr[b][s]);
+  const top = 6, bot = Hc - 34, X = s => rev ? (s1 - s) / (s1 - s0) * Wc : (s - s0) / (s1 - s0) * Wc, Y = v => bot - v / mx * (bot - top);
+  const col = BCOL(), cs = getComputedStyle(document.documentElement);
+  // highlight
+  g.fillStyle = cs.getPropertyValue('--accent-soft'); const cx = X(ab.ploc[raw]); g.fillRect(cx - 7, 0, 14, Hc);
+  for (const b of 'ACGT') { const shown = rev ? COMP[b] : b; g.strokeStyle = col[shown]; g.lineWidth = 1.4; g.beginPath(); for (let s = s0; s <= s1; s++) { const px = X(s), py = Y(Math.max(0, ab.tr[b][s])); s === s0 ? g.moveTo(px, py) : g.lineTo(px, py); } g.stroke(); }
+  g.font = '700 12px JetBrains Mono, monospace'; g.textAlign = 'center';
+  for (let j = b0; j <= b1; j++) {
+    const px = X(ab.ploc[j]); let b = x.calls[j]; if (rev) b = COMP[b] || 'N';
+    g.fillStyle = isAmb(b) ? cs.getPropertyValue('--orange') : (col[b] || cs.getPropertyValue('--muted')); g.fillText(b, px, Hc - 18);
+    if (ab.qual) { const q = ab.qual[j]; g.fillStyle = cs.getPropertyValue('--line'); g.fillRect(px - 3, Hc - 12, 6, 10); g.fillStyle = q >= 30 ? cs.getPropertyValue('--green') : q >= 20 ? cs.getPropertyValue('--orange') : cs.getPropertyValue('--red'); g.fillRect(px - 3, Hc - 2 - Math.min(10, q / 6), 6, Math.min(10, q / 6)); }
+  }
+  const h = {}; for (const b of 'ACGT') h[rev ? COMP[b] : b] = peakH(ab, raw, b);
+  const srt = Object.entries(h).sort((a, b) => b[1] - a[1]);
+  $('#trInfo' + r.id).textContent = `peaks ${srt.map(([b, v]) => `${b} ${v}`).join(' · ')} · secondary/primary ${srt[0][1] ? Math.round(srt[1][1] / srt[0][1] * 100) : 0}%${ab.qual ? ` · Q${ab.qual[raw]}` : ''} · call ${rev ? COMP[x.calls[raw]] : x.calls[raw]}`;
+}
+
+/* ---------- reference panel ---------- */
+let REFTAB = 'genomic';
+function refText(tab) { if (!R) return ''; if (tab === 'genomic') { let s = R.seq.toLowerCase().split(''); for (const e of R.exons) for (let i = e.s; i <= e.e; i++) s[i] = R.seq[i]; return s.join(''); } return tab === 'cds' ? R.cds : tab === 'mrna' ? R.mrna : R.prot; }
+function renderRef() {
+  $('#refTabs').innerHTML = [['genomic', 'Genomic ±250 bp'], ['cds', 'CDS'], ['mrna', 'mRNA'], ['prot', 'Protein']].map(([k, l]) => `<button class="tab ${REFTAB === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('');
+  if (!R) return;
+  const box = $('#refBox');
+  if (REFTAB === 'genomic') {
+    let h = '', p = 0; for (const e of R.exons) { h += `<span class="in">${R.seq.slice(p, e.s).toLowerCase()}</span><span class="ex" title="Exon ${e.n}">${R.seq.slice(e.s, e.e + 1)}</span>`; p = e.e + 1; } h += `<span class="in">${R.seq.slice(p).toLowerCase()}</span>`;
+    box.innerHTML = h; $('#refNote').textContent = `${R.chrAcc}:${R.gStart}-${R.gEnd} (${R.strand > 0 ? '+' : '−'}), gene orientation · exons UPPERCASE · ${R.seq.length.toLocaleString()} bp`;
+  } else if (REFTAB === 'cds') {
+    let h = '', alt = false; for (const e of R.exons) { let a = '', any = false; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { a += R.seq[i]; any = true; } if (any) { h += `<span class="${alt ? 'alt' : 'ex'}" title="Exon ${e.n}">${a}</span>`; alt = !alt; } }
+    box.innerHTML = h; $('#refNote').textContent = `${R.tx} CDS ${R.cds.length} nt · alternating colour per exon`;
+  } else { box.textContent = refText(REFTAB); $('#refNote').textContent = REFTAB === 'mrna' ? `${R.tx} · ${R.mrna.length} nt` : `${R.np} · ${R.prot.length} aa (incl. stop)`; }
+}
+
+/* =====================================================================
+   9. Export to Excel (ExcelJS, loaded on demand)
+   ===================================================================== */
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('could not load ' + src)); document.head.appendChild(s); }); }
+async function ensureExcel() { if (window.ExcelJS) return; try { await loadScript('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'); } catch (e) { await loadScript('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'); } }
+const XFILL = {P: ['FFF4CCCC', 'FF9C0006'], LP: ['FFFCE4D6', 'FF9C5700'], VUS: ['FFFFF2CC', 'FF7F6000'], LB: ['FFE2EFDA', 'FF375623'], B: ['FFC6EFCE', 'FF006100'], WT: ['FFF2F2F2', 'FF404040']};
+async function exportXlsx() {
+  if (!R) return toast('Load a gene first');
+  const patient = $('#patient').value.trim();
+  if (!patient) { toast('Enter the patient name first'); $('#patient').focus(); return; }
+  const pending = VARS.filter(v => ANN.get(v.key)?.st === 'run').length;
+  if (pending && !confirm(`${pending} variant(s) are still being annotated. Export anyway?`)) return;
+  const btn = $('#exportBtn'); btn.disabled = true; btn.textContent = 'Preparing…';
+  try {
+    await ensureExcel();
+    const wb = new ExcelJS.Workbook(); wb.creator = 'SangerScope'; wb.created = new Date();
+    const ws = wb.addWorksheet('Variants', {views: [{state: 'frozen', ySplit: 8}]});
+    const today = new Date().toISOString().slice(0, 10);
+    const cs = R.covStat || {n: R.coding.length, c1: 0, c2: 0};
+    const head = ['Patient', 'Gene', 'Transcript', 'HGVS c.', 'HGVS p.', 'Location', 'Zygosity', 'Variant type', 'Consequence', 'GRCh38 (g.)', 'dbSNP', 'ClinVar', 'ClinVar review', 'gnomAD v4 AF', 'REVEL', 'AlphaMissense', 'CADD phred', 'SpliceAI max Δ', 'MobiDetails', 'Supporting reads', 'Flags', 'Classification', 'Notes'];
+    const LAST = String.fromCharCode(64 + head.length), CLS_COL = head.indexOf('Classification') + 1;
+    const reads = goodReads();
+    const meta = [
+      ['Patient', patient + ($('#sample').value.trim() ? `   (${$('#sample').value.trim()})` : '')],
+      ['Gene', `${R.symbol} — ${R.tx}${R.select === 'MANE_SELECT' ? ' (MANE Select)' : ''} · ${R.np}${R.ccds ? ' · ' + R.ccds : ''} · ${R.chrAcc} (GRCh38)`],
+      ['Analysis date', today],
+      ['Reads', reads.map(r => `${r.name}${r.res.rev ? '←' : '→'} ${cRange(r.res.rs, r.res.re)}`).join('; ') || 'none'],
+      ['CDS coverage', `${(cs.c1 / cs.n * 100).toFixed(1)}% ≥1 read · ${(cs.c2 / cs.n * 100).toFixed(1)}% forward + reverse (${cs.n} coding bp)`],
+    ];
+    ws.mergeCells(`A1:${LAST}1`); ws.getCell('A1').value = `Sanger sequencing results — ${R.symbol} — ${patient}`;
+    ws.getCell('A1').font = {bold: true, size: 14, color: {argb: 'FFFFFFFF'}}; ws.getCell('A1').fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FF1F3864'}}; ws.getRow(1).height = 24;
+    meta.forEach(([k, v], j) => { const r = j + 2; ws.getCell(`A${r}`).value = k; ws.getCell(`A${r}`).font = {bold: true}; ws.mergeCells(`B${r}:${LAST}${r}`); ws.getCell(`B${r}`).value = v; });
+    const hr = ws.getRow(8); hr.values = head; hr.height = 32;
+    hr.eachCell(c => { c.font = {bold: true, color: {argb: 'FFFFFFFF'}}; c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FF1F3864'}}; c.alignment = {vertical: 'middle', horizontal: 'center', wrapText: true}; });
+    const inc = VARS.filter(v => (UCLS.get(v.key) || {}).cls !== 'ART');
+    let rn = 9;
+    const kindName = {snv: 'SNV', del: 'Deletion', ins: 'Insertion', dup: 'Duplication', delins: 'Delins'};
+    for (const v of inc) {
+      const a = ANN.get(v.key) || {}, u = UCLS.get(v.key) || {cls: '', note: ''};
+      const cv = a.cv?.exact;
+      const row = ws.getRow(rn++);
+      row.values = [patient, R.symbol, R.tx, a.vv?.c || v.hgvs, a.vv?.p || v.p || '', v.loc, v.zyg === 'het' ? 'Heterozygous' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Homozygous/hemizygous' : 'Homozygous') : 'Discordant between reads',
+        kindName[v.kind] || v.kind, [v.type, v.effect].filter(Boolean).join('; '), a.vv?.g || a.g || genomicOf(v).g, cv?.rs || a.gn?.rs || '',
+        cv ? cv.cls : (a.cv ? 'Not in ClinVar' : 'not queried'), cv ? `${cv.review} (${cv.stars}★) ${cv.acc}` : '', a.gn ? (a.gn.found ? fmtAF(a.gn.af) + ` (${a.gn.ac}/${a.gn.an}${a.gn.hom ? ', ' + a.gn.hom + ' hom' : ''})` : 'absent') : '',
+        a.md?.revel ?? '', a.md?.am != null ? `${a.md.am}${a.md.amPred ? ' (' + a.md.amPred + ')' : ''}` : '', a.md?.cadd ?? '', a.md?.sai ?? '', a.md?.id ? {text: `MD ${a.md.id}`, hyperlink: a.md.url} : (a.md?.absent ? 'not in MD' : ''),
+        v.sup.map(s => `${s.r.name}${s.r.res.rev ? '←' : '→'}`).join(', '), v.flags.map(f => f.t).join('; '), CLS_NAME[u.cls] && u.cls ? CLS_NAME[u.cls] : 'Not classified', u.note || ''];
+      row.eachCell(c => { c.alignment = {vertical: 'top', wrapText: true}; });
+      const fc = XFILL[u.cls]; if (fc) { const c = row.getCell(CLS_COL); c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: fc[0]}}; c.font = {bold: true, color: {argb: fc[1]}}; }
+      row.getCell(4).font = {name: 'Consolas', bold: true};
+    }
+    if (!inc.length) {
+      const row = ws.getRow(rn++);
+      row.values = [patient, R.symbol, R.tx, '—', '—', reads.map(r => cRange(r.res.rs, r.res.re)).join('; '), '—', '—', 'No variant detected', '', '', '', '', '', '', '', '', '', '', reads.map(r => r.name).join(', '), '', 'Wild-type', ''];
+      const c = row.getCell(CLS_COL); c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: XFILL.WT[0]}}; c.font = {bold: true, color: {argb: XFILL.WT[1]}};
+    }
+    [16, 9, 13, 26, 22, 18, 13, 12, 22, 30, 13, 22, 30, 18, 8, 16, 8, 9, 11, 20, 30, 18, 26].forEach((w, k) => ws.getColumn(k + 1).width = w);
+    ws.autoFilter = {from: 'A8', to: `${LAST}${Math.max(9, rn - 1)}`};
+    // coverage sheet
+    const w2 = wb.addWorksheet('Reads & coverage');
+    w2.addRow(['Read', 'Source', 'Orientation', 'Aligned region', 'Length aligned', 'Identity', 'Amplicon', 'Mixed-trace regions']).font = {bold: true};
+    for (const r of READS) { const x = r.res; if (!x) continue; w2.addRow([r.name, r.ab ? 'AB1' : 'text', x.status === 'ok' ? (x.rev ? 'reverse' : 'forward') : x.status, x.status === 'ok' ? cRange(x.rs, x.re) : '', x.status === 'ok' ? x.re - x.rs + 1 : '', x.status === 'ok' ? (x.ident * 100).toFixed(1) + '%' : '', ampOf(r)?.name || '', (x.mixInfo || []).map(m => `${m.approx ? '~' : ''}c.${cLabel(m.start)}${m.shift ? ` (het indel, shift ${Math.abs(m.shift)} bp)` : ' (mixed)'}`).join('; ')]); }
+    w2.addRow([]); w2.addRow(['Exon', 'Coding bp', 'Covered', 'Forward + reverse']).font = {bold: true};
+    const cov = coverageArrays();
+    for (const e of R.exons) { let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; } if (nc) w2.addRow([e.n, nc, `${k1} (${Math.round(k1 / nc * 100)}%)`, `${k2} (${Math.round(k2 / nc * 100)}%)`]); }
+    if (AMPS.length) { w2.addRow([]); w2.addRow(['Amplicon', 'Size', 'Sequenced insert', 'Exons', 'Notes']).font = {bold: true}; for (const a of AMPS) w2.addRow(a.ok ? [a.name, a.size, cRange(a.ins[0], a.ins[1]), a.exons, a.notes.join('; ')] : [a.name, '', '', '', a.notes.join('; ')]); }
+    [16, 10, 14, 34, 14, 10, 14, 40].forEach((w, k) => w2.getColumn(k + 1).width = w);
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `Resultats_${R.symbol}_${patient.replace(/[^\w\-]+/g, '_')}_${today}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Excel file downloaded');
+  } catch (e) { toast('Export failed: ' + e.message, 5000); }
+  finally { btn.disabled = false; btn.textContent = 'Export Excel'; }
+}
+
+/* =====================================================================
+   10. Input handling & events
+   ===================================================================== */
+function cleanSeq(s) { return s.toUpperCase().replace(/U/g, 'T').replace(/[^ACGTRYSWKMBDHVN]/g, ''); }
+function addRead(obj) { const r = Object.assign({id: ++readSeq, on: true}, obj); READS.push(r); processRead(r); return r; }
+function parseFasta(txt, fallback) {
+  const recs = []; let cur = null;
+  for (const line of txt.split(/\r?\n/)) { if (line.startsWith('>')) { cur = {name: line.slice(1).trim() || fallback, seq: ''}; recs.push(cur); } else { if (!cur) { cur = {name: fallback, seq: ''}; recs.push(cur); } cur.seq += line; } }
+  return recs.map(r => ({name: r.name, seq: cleanSeq(r.seq)})).filter(r => r.seq.length >= 20);
+}
+async function handleFiles(files) {
+  let n = 0;
+  for (const f of files) {
+    const base = f.name.replace(/\.[^.]+$/, '');
+    try {
+      const buf = await f.arrayBuffer(); const u = new Uint8Array(buf, 0, 4);
+      if (String.fromCharCode(...u) === 'ABIF') { addRead({name: base, ab: parseAB1(buf)}); n++; }
+      else { const recs = parseFasta(new TextDecoder().decode(buf), base); recs.forEach(r => addRead({name: recs.length > 1 ? r.name : (r.name === base ? base : r.name), seq: r.seq})); n += recs.length; if (!recs.length) toast(`${f.name}: no sequence found`); }
+    } catch (e) { toast(`${f.name}: ${e.message}`, 4000); }
+  }
+  if (n) { if (!R) toast('Reads loaded — now load a gene'); refresh(); }
+}
+function readById(id) { return READS.find(r => r.id === +id); }
+
+function bind() {
+  measureChar(); if (document.fonts) document.fonts.ready.then(measureChar);
+  $('#loadGene').onclick = () => loadGene($('#geneInput').value);
+  $('#geneInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadGene(e.target.value); });
+  $('#txSelect').onchange = e => loadTranscript(+e.target.value).catch(err => toast(err.message, 5000));
+  const drop = $('#drop'), fi = $('#fileInput');
+  drop.onclick = () => fi.click();
+  fi.onchange = () => { handleFiles([...fi.files]); fi.value = ''; };
+  ['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || e.target === document.documentElement) drop.classList.remove('over'); }));
+  document.addEventListener('drop', e => { drop.classList.remove('over'); if (e.dataTransfer?.files?.length) handleFiles([...e.dataTransfer.files]); });
+  $('#pasteAdd').onclick = () => {
+    const txt = $('#pasteBox').value.trim(); if (!txt) return;
+    const recs = parseFasta(txt, $('#pasteName').value.trim() || `pasted${READS.length + 1}`);
+    if (!recs.length) return toast('No sequence of ≥ 20 bases found');
+    recs.forEach(r => addRead(r)); $('#pasteBox').value = ''; $('#pasteName').value = ''; if (!R) toast('Sequence added — now load a gene'); refresh();
+  };
+  $('#readsList').onclick = e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return; const r = readById(b.dataset.id); if (!r) return;
+    const act = b.dataset.act;
+    if (act === 'del') { READS.splice(READS.indexOf(r), 1); refresh(); }
+    else if (act === 'tog') { r.on = !r.on; refresh(); }
+    else if (act === 'go') { if (r.res?.status === 'ok') scrollToIdx(r.res.rs, false); }
+    else if (act === 'copy') { const x = r.res; if (x?.q) copyText(x.q, 'Read copied (trimmed, gene orientation)'); else copyText(r.ab ? r.ab.base : r.seq); }
+    else if (act === 'fa') copyText(`>${r.name}\n${r.ab ? r.ab.base : r.seq}\n`, 'FASTA copied');
+  };
+  $('#primerBtn').onclick = () => locatePrimers(true);
+  $('#exportBtn').onclick = exportXlsx;
+  $('#clearBtn').onclick = () => { if (READS.length && !confirm('Remove all reads, variants and classifications for this patient?')) return; READS.length = 0; UCLS.clear(); SEL = null; CUR = -1; $('#patient').value = ''; $('#sample').value = ''; $('#tracePanel').classList.remove('on'); refresh(); };
+  // variant table
+  const vt = $('#varTable');
+  vt.addEventListener('click', e => {
+    const ann = e.target.closest('[data-ann]'); if (ann) { e.stopPropagation(); annotate(ann.dataset.ann); return; }
+    const rt = e.target.closest('[data-retry]'); if (rt) { e.preventDefault(); e.stopPropagation(); annotate(rt.dataset.retry, true); return; }
+    if (e.target.closest('select,input,a,details')) return;
+    const tr = e.target.closest('tr.vr'); if (!tr) return; const v = VARS.find(x => x.key === tr.dataset.key); if (!v) return;
+    SEL = v.key; renderVariants(); scrollToIdx(v.s); if (v.sup.some(s => s.r.ab) || v.other.some(o => o.r.ab)) showTraces(v.s);
+  });
+  vt.addEventListener('change', e => { const s = e.target.closest('[data-cls]'); if (s) { const u = UCLS.get(s.dataset.cls) || {cls: '', note: ''}; u.cls = s.value; UCLS.set(s.dataset.cls, u); renderCoverage(); renderSummary(); } });
+  vt.addEventListener('input', e => { const s = e.target.closest('[data-note]'); if (s) { const u = UCLS.get(s.dataset.note) || {cls: '', note: ''}; u.note = s.value; UCLS.set(s.dataset.note, u); } });
+  // coverage map
+  $('#covSvg').addEventListener('click', e => {
+    if (!R || !LAYOUT) return; const g = e.target.closest('[data-read]');
+    if (g) { const r = readById(g.dataset.read); if (r) scrollToIdx(r.res.rs, false); return; }
+    const svg = $('#covSvg'), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    scrollToIdx(idxOfX(Math.max(0, p.x - 10)));
+  });
+  $('#exonChips').onclick = e => { const c = e.target.closest('[data-idx]'); if (c) { let i = +c.dataset.idx; while (!isCoding(i) && i < R.seq.length - 1 && R.mpos[i]) i++; scrollToIdx(i, false); } };
+  // alignment
+  $('#viewMode').value = ST.view; $('#blockW').value = String(ST.width); $('#dotsChk').checked = ST.dots;
+  $('#viewMode').onchange = e => { ST.view = e.target.value; saveSettings(); renderAlignment(); };
+  $('#blockW').onchange = e => { ST.width = +e.target.value; saveSettings(); renderAlignment(); };
+  $('#dotsChk').onchange = e => { ST.dots = e.target.checked; saveSettings(); renderAlignment(); };
+  const jump = () => { if (!R) return; const i = cToIndex($('#jumpInput').value); if (i == null) return toast('Unrecognised c. position'); scrollToIdx(i); };
+  $('#jumpBtn').onclick = jump; $('#jumpInput').addEventListener('keydown', e => { if (e.key === 'Enter') jump(); });
+  const aln = $('#aln');
+  const idxAt = (sq, e) => { const rect = sq.getBoundingClientRect(); const k = Math.floor((e.clientX - rect.left) / CHW); return +sq.dataset.s + Math.max(0, k); };
+  aln.addEventListener('mousemove', e => { const sq = e.target.closest('.sq'); if (!sq || !R) return; const i = idxAt(sq, e), blk = sq.closest('.blk'); if (i > +blk.dataset.e) return; setStatus(i, sq.dataset.r ? readById(sq.dataset.r) : null); });
+  aln.addEventListener('click', e => { if (String(window.getSelection())) return; const sq = e.target.closest('.sq'); if (!sq || !R) return; const i = idxAt(sq, e); if (i > +sq.closest('.blk').dataset.e) return; CUR = i; renderAlignment(); const r = sq.dataset.r ? readById(sq.dataset.r) : null; setStatus(i, r); if (goodReads().some(x => x.ab && readCovers(x, i))) showTraces(i); });
+  // reference panel
+  $('#refTabs').onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { REFTAB = t.dataset.tab; renderRef(); } };
+  $('#refCopy').onclick = () => R && copyText(refText(REFTAB), 'Sequence copied');
+  $('#refCopyFa').onclick = () => { if (!R) return; const hdr = REFTAB === 'genomic' ? `${R.chrAcc}:${R.gStart}-${R.gEnd}${R.strand < 0 ? ' (minus strand, reverse complemented)' : ''} ${R.symbol} ${R.tx} ±${FLANK}bp` : REFTAB === 'prot' ? `${R.np} ${R.symbol}` : `${R.tx} ${R.symbol} ${REFTAB.toUpperCase()}`; copyText(`>${hdr}\n${refText(REFTAB)}\n`, 'FASTA copied'); };
+  $('#regBtn').onclick = () => { if (!R) return; const a = cToIndex($('#regFrom').value), b = cToIndex($('#regTo').value); if (a == null || b == null || b < a) return toast('Enter valid c. positions (from ≤ to)'); const s = R.seq.slice(a, b + 1).split('').map((ch, k) => R.mpos[a + k] ? ch : ch.toLowerCase()).join(''); $('#regOut').textContent = s; $('#regOut').dataset.hdr = `${R.symbol} ${cRange(a, b)} (${b - a + 1} bp)`; };
+  $('#regCopy').onclick = () => { const t = $('#regOut').textContent; if (t) copyText(t, 'Region copied'); };
+  // settings
+  const dlg = $('#settingsDlg');
+  $('#setBtn').onclick = () => { $('#sHet').value = ST.het; $('#sHetV').textContent = Math.round(ST.het * 100) + '%'; $('#sTrim').checked = ST.trim; $('#sTrimQ').value = ST.trimQ; $('#sEdge').value = ST.edge; $('#sAuto').checked = ST.auto; $('#sKey').value = ST.ncbiKey; $('#sMdKey').value = ST.mdKey || ''; dlg.showModal(); };
+  $('#sHet').oninput = e => { $('#sHetV').textContent = Math.round(e.target.value * 100) + '%'; };
+  const applySet = () => { ST.het = +$('#sHet').value; ST.trim = $('#sTrim').checked; ST.trimQ = +$('#sTrimQ').value || 20; ST.edge = +$('#sEdge').value || 0; ST.auto = $('#sAuto').checked; ST.ncbiKey = $('#sKey').value.trim(); ST.mdKey = $('#sMdKey').value.trim(); saveSettings(); READS.forEach(processRead); refresh(); };
+  ['sHet', 'sTrim', 'sTrimQ', 'sEdge', 'sAuto'].forEach(id => $('#' + id).addEventListener('change', applySet));
+  $('#setClose').onclick = () => { applySet(); dlg.close(); };
+  $('#sKey').addEventListener('change', () => { ST.ncbiKey = $('#sKey').value.trim(); saveSettings(); });
+  $('#sMdKey').addEventListener('change', () => { ST.mdKey = $('#sMdKey').value.trim(); saveSettings(); });
+  $('#sClearCache').onclick = () => { let n = 0; try { for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if (/^ssv-(ann2|prod)-/.test(key)) { localStorage.removeItem(key); n++; } } } catch (e) {} toast(`Cleared ${n} cached entries`); };
+  window.addEventListener('beforeunload', e => { if (READS.length) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('resize', () => { if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); });
+  renderRef(); renderCoverage(); renderPrimers();
+}
+bind();
+</script>
+</body>
+</html>
