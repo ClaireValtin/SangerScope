@@ -298,7 +298,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
   </section>
 </main>
 <footer>
-  References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more). Heterozygous calls are made from secondary-peak ratios and must be confirmed on the trace; heterozygous indels are flagged as mixed-trace regions, not called. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out). For laboratory use with expert review.
+  References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more). Heterozygous SNVs are called from secondary-peak ratios; heterozygous deletions, insertions and duplications (up to 30 bp) are called by deconvolving the two-allele trace against the reference. Every call is checked against VariantValidator and must be confirmed on the trace. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out). For laboratory use with expert review.
 </footer>
 
 <dialog id="settingsDlg">
@@ -310,7 +310,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
     <div class="row"><input type="checkbox" id="sTrim"><input type="number" id="sTrimQ" class="inp" style="width:64px" min="5" max="40"> Q</div>
     <div>Read-edge zone (bp)<small>Variants this close to an alignment end are flagged.</small></div>
     <input type="number" id="sEdge" class="inp" style="width:70px" min="0" max="50">
-    <div>Annotate variants automatically<small>VariantValidator → ClinVar → gnomAD, queued to respect rate limits.</small></div>
+    <div>Annotate variants automatically<small>ClinVar → gnomAD → MobiDetails, queued to respect rate limits. The VariantValidator nomenclature check always runs.</small></div>
     <input type="checkbox" id="sAuto">
     <div>NCBI API key (optional)<small>Raises the NCBI limit from 3 to 10 requests/s. Stored only in this browser.</small></div>
     <input type="password" id="sKey" class="inp" style="width:180px" autocomplete="off">
@@ -617,11 +617,89 @@ function findMixed(cb, ts, te) {
     const strong = nS >= 15 && bestF >= 0.7 && bestF - second >= 0.25 && b - a + 1 >= 25;
     if (!strong) bestF = Math.min(bestF, 0.59);
     let start = a; if (bestF >= 0.6) { for (let x = a; x <= b; x++) if (cb.sig[x] && cb.sec[x] === cb.pri[x + bestK]) { start = x; break; } }
+    else { for (let x = a; x <= b; x++) if (cb.sig[x]) { start = x; break; } }
     const indel = bestF >= 0.6;
-    if (indel || b <= te) out.push({a: start, b, shift: indel ? bestK : 0, frac: bestF, n: nS, beyondTrim: start > te});
+    // regions past the trim end are kept for reference-based deconvolution (callHetIndel); unresolved ones are dropped later
+    out.push({a: start, b, shift: indel ? bestK : 0, frac: bestF, n: nS, beyondTrim: start > te});
     a = -1;
   }
   return out;
+}
+
+/* Heterozygous indel calling by trace deconvolution against the reference.
+   Past a heterozygous indel the trace is the superposition of the reference allele and the
+   same reference shifted by the indel length, so at every position the two tallest peaks must be
+   {ref[t], ref[t + shift]}. The self-shift test in findMixed compares secondary peaks with *primary*
+   calls, which fails when both alleles are balanced (the primary call flips between alleles);
+   here each hypothesis is scored against the reference instead:
+     1. anchor: last cleanly aligned base before the mixed region → raw ↔ reference offset
+     2. shift: every deletion (+1…+MAXS) and insertion (−1…−MAXS); the best must explain ≥ 80 %
+        of positions and beat the reference-only hypothesis clearly
+     3. breakpoint: clean single peaks before, two-allele fit after; inserted bases are read off
+        the non-reference peaks
+   Returns an event in gene orientation (normalised later), or null. */
+const HI_MAXS = 30, HI_SPAN = 110;
+function callHetIndel(ab, cb, res, m) {
+  const L = R.seq.length, rev = res.rev, n = ab.base.length;
+  const refR = rev ? (R.rc || (R.rc = revcomp(R.seq))) : R.seq;           // reference in sequencing direction
+  const rawToGene = new Map(); for (let x = 0; x < res.rawAt.length; x++) if (res.rawAt[x] >= 0) rawToGene.set(res.rawAt[x], res.rs + x);
+  const dir = rev ? -1 : 1, jOf = g => rev ? L - 1 - g : g;
+  let anchor = -1;
+  for (let t = m.a - 1; t >= Math.max(0, m.a - 60) && anchor < 0; t--) {
+    const g = rawToGene.get(t); if (g == null) continue;
+    let ok = true; for (let k = 1; k <= 8 && ok; k++) if (rawToGene.get(t - k) !== g - k * dir) ok = false;
+    if (ok) anchor = t;
+  }
+  if (anchor < 0) return null;
+  const off = jOf(rawToGene.get(anchor)) - anchor;
+  const H = new Map(); const hts = t => { let h = H.get(t); if (!h) { h = {A: peakH(ab, t, 'A'), C: peakH(ab, t, 'C'), G: peakH(ab, t, 'G'), T: peakH(ab, t, 'T')}; H.set(t, h); } return h; };
+  const top2 = t => { const h = hts(t); let p = 'A', s = 'C'; if (h.C > h.A) { p = 'C'; s = 'A'; } for (const b of 'GT') { if (h[b] > h[p]) { s = p; p = b; } else if (h[b] > h[s]) s = b; } return {p, s, r: h[p] > 0 ? h[s] / h[p] : 0}; };
+  const refAt = j => j >= 0 && j < L ? refR[j] : 'N';
+  const cleanWT = t => { const w = refAt(t + off), x = top2(t); return x.p === w && x.r < 0.3; };
+  const fits = (t, s) => {   // t: raw position past the breakpoint, s: shift (allele 2 = ref[t+off+s])
+    const w = refAt(t + off), mu = refAt(t + off + s); if (w === 'N' || mu === 'N') return null;
+    const x = top2(t);
+    return w === mu ? x.p === w && x.r < 0.3 : ((x.p === w && x.s === mu) || (x.p === mu && x.s === w)) && x.r >= 0.15;
+  };
+  const end = Math.min(n, m.a + HI_SPAN);
+  const score = (s, from) => { let ok = 0, tot = 0, inf = 0, infOk = 0; for (let t = from; t < end; t++) { const f = fits(t, s); if (f == null) continue; tot++; ok += f; if (refAt(t + off) !== refAt(t + off + s)) { inf++; infOk += f; } } return {f: tot ? ok / tot : 0, tot, inf, infOk}; };
+  // reference-only fit over the same stretch (a real het indel leaves it far behind)
+  let wtOk = 0, wtTot = 0; for (let t = m.a + 1; t < end; t++) { if (refAt(t + off) === 'N') continue; wtTot++; wtOk += cleanWT(t); }
+  let best = null;
+  for (let s = -HI_MAXS; s <= HI_MAXS; s++) {
+    if (!s) continue;
+    const sc = score(s, m.a + Math.max(0, -s) + 1);
+    if (sc.tot < 25 || sc.inf < 12) continue;
+    if (!best || sc.f > best.f + 1e-9 || (Math.abs(sc.f - best.f) < 1e-9 && Math.abs(s) < Math.abs(best.s))) best = {...sc, s};
+  }
+  if (!best || best.f < 0.8 || best.infOk / best.inf < 0.75 || best.f - (wtTot ? wtOk / wtTot : 0) < 0.25) return null;
+  // breakpoint: clean reference before, two-allele fit after (inserted bases are free)
+  const s = best.s, ins = Math.max(0, -s);
+  let bp = -1, bpSc = -1;
+  for (let b = Math.max(anchor - 20, 1); b <= m.a; b++) {
+    let sc = 0;
+    for (let t = Math.max(0, b - 15); t < b; t++) sc += cleanWT(t);
+    for (let t = b + ins; t < Math.min(end, b + ins + 40); t++) sc += fits(t, s) ? 1 : 0;
+    if (sc > bpSc) { bpSc = sc; bp = b; }
+  }
+  if (bp < 0) return null;
+  const j = bp + off;   // reference index (sequencing direction) where the two alleles part
+  let ev;
+  if (s > 0) {
+    const gs = rev ? L - 1 - (j + s - 1) : j, ge = rev ? L - 1 - j : j + s - 1;
+    if (gs < 0 || ge >= L) return null;
+    ev = {kind: 'del', s: gs, e: ge, ref: R.seq.slice(gs, ge + 1), alt: ''};
+  } else {
+    let X = ''; for (let t = bp; t < bp + ins; t++) { const w = refAt(t + off), x = top2(t); X += x.r >= 0.15 && x.p === w ? x.s : x.p; }
+    ev = {kind: 'ins', p: rev ? L - 1 - j : j - 1, alt: rev ? revcomp(X) : X};
+    if (ev.p < 0 || ev.p >= L - 1) return null;
+  }
+  // allele balance: second-allele / reference peak height where the alleles differ
+  const rat = [];
+  for (let t = bp + ins; t < end && rat.length < 60; t++) { const w = refAt(t + off), mu = refAt(t + off + s); if (w !== mu && w !== 'N' && mu !== 'N' && fits(t, s)) { const h = hts(t); if (h[w] > 0) rat.push(h[mu] / h[w]); } }
+  rat.sort((a, b) => a - b);
+  const gBreak = rev ? L - 1 - j : j;
+  return {ev, shift: s, fit: best.f, nPos: best.tot, ratio: rat.length ? rat[rat.length >> 1] : null, rawBreak: bp, zone: rev ? [-Infinity, gBreak] : [gBreak, Infinity]};
 }
 
 /* =====================================================================
@@ -717,7 +795,7 @@ function processRead(r) {
     if (qi[c] >= 0 && rj[c] >= 0 && SC[q.charCodeAt(qi[c]) * 128 + R.seq.charCodeAt(rj[c])] > 0) ident++;
   }
   Object.assign(res, {rev, q, qi, rj, rs, re, score: best.score, ident: ident / aligned, rawOf: raw});
-  if (re - rs + 1 < 30 || res.ident < 0.8) { res.status = 'lowid'; return; }
+  if (re - rs + 1 < 30) { res.status = 'lowid'; return; }
   // ref-anchored view
   const span = re - rs + 1, chars = new Array(span).fill(' '), rawAt = new Int32Array(span).fill(-1), ins = new Map();
   let lastR = -1, pend = '';
@@ -729,6 +807,17 @@ function processRead(r) {
     } else pend += q[qi[c]];
   }
   Object.assign(res, {chars, rawAt, ins});
+  // heterozygous indels: deconvolve each mixed region against the reference (first resolvable one wins:
+  // past a het indel the rest of the read is a two-allele mixture)
+  res.het = null;
+  if (r.ab) for (const m of res.mixed) { const h = callHetIndel(r.ab, cb, res, m); if (h) { m.call = h; m.shift = h.shift; m.frac = h.fit; m.a = h.rawBreak; m.beyondTrim = h.rawBreak > te; res.het = h; break; } }
+  res.mixed = res.mixed.filter(m => m.call || m.shift || !m.beyondTrim);
+  if (res.het) {   // identity only over the single-allele part: the mixed part is two superposed sequences
+    let al = 0, id = 0; const z = res.het.zone;
+    for (let c = 0; c < qi.length; c++) { if (rj[c] >= 0 && rj[c] >= z[0] && rj[c] <= z[1]) continue; al++; if (qi[c] >= 0 && rj[c] >= 0 && SC[q.charCodeAt(qi[c]) * 128 + R.seq.charCodeAt(rj[c])] > 0) id++; }
+    if (al >= 30) res.ident = id / al;
+  }
+  if (res.ident < 0.8) { res.status = 'lowid'; return; }
   // mixed-trace regions → ref coords
   let minRaw = Infinity, maxRaw = -1, refAtMin = -1, refAtMax = -1;
   for (let x = 0; x < span; x++) { const w = rawAt[x]; if (w < 0) continue; if (w < minRaw) { minRaw = w; refAtMin = rs + x; } if (w > maxRaw) { maxRaw = w; refAtMax = rs + x; } }
@@ -742,11 +831,17 @@ function processRead(r) {
     if (exact >= 0) start = exact;
     else { approx = true; const off = m.a > maxRaw ? m.a - maxRaw : m.a - minRaw, anchor = m.a > maxRaw ? refAtMax : refAtMin; start = clampI(rev ? anchor - off : anchor + off); }
     const end = clampI(rev ? start - (m.b - m.a) : start + (m.b - m.a));
-    res.mixInfo.push({start, end, approx, shift: m.shift, frac: m.frac, beyondTrim: m.beyondTrim});
+    res.mixInfo.push({start, end, approx, shift: m.shift, frac: m.frac, beyondTrim: m.beyondTrim, call: m.call || null});
   }
   // duplicate detection key
   res.sig = q.slice(0, 400);
   res.events = extractEvents(r, res);
+  if (res.het) {
+    const h = res.het, z = h.zone, inZone = e => { const i = e.kind === 'ins' && e.s == null ? e.p : e.s; return i >= z[0] && i <= z[1]; };
+    res.events = res.events.filter(e => !inZone(e));   // calls inside the two-allele mixture are artefacts of the primary-peak basecalls
+    const ev = Object.assign({...h.ev, rawI: h.rawBreak, q: null, ratio: h.ratio, edge: false, zyg: 'het', mixed: false, hetIndel: true, fit: h.fit, nPos: h.nPos}, normalize(h.ev));
+    if (ev.hgvs) { res.events.push(ev); h.hgvs = ev.hgvs; }
+  }
 }
 
 function inMix(res, i) { return res.mixRef.some(([a, b]) => i >= a && i <= b); }
@@ -822,6 +917,46 @@ function normalize(ev) {
   return {hgvs: null};
 }
 
+/* Local protein consequence for any change inside the coding exons: edit the mRNA, translate
+   to the first stop and describe the difference in HGVS p. (3′ rule at protein level).
+   Returns null when the change crosses an exon/intron junction (no clean mRNA edit). */
+function protEffect(v) {
+  const M = R.mpos; let m1, m2;   // mRNA m1…m2 (1-based, inclusive; m2 = m1 − 1 for a pure insertion) → alt
+  if (v.kind === 'ins' || v.kind === 'dup') { const p = v.kind === 'dup' ? v.e : v.s; if (!M[p] || M[p + 1] !== M[p] + 1) return null; m1 = M[p] + 1; m2 = M[p]; }
+  else { if (!M[v.s] || !M[v.e] || M[v.e] - M[v.s] !== v.e - v.s) return null; m1 = M[v.s]; m2 = M[v.e]; }
+  const alt = v.alt || '', cS = R.cdsS, cE = R.cdsE, delta = alt.length - (m2 - m1 + 1), fs = delta % 3 !== 0;
+  const nk = v.kind === 'del' ? 'deletion' : v.kind === 'dup' ? 'duplication' : v.kind === 'ins' ? 'insertion' : 'delins';
+  if (m2 < cS) return {p: '', type: "5′UTR"};
+  if (m1 > cE) return {p: '', type: "3′UTR"};
+  if (m1 <= cS + 2 && m2 >= cS) return {p: 'p.(Met1?)', type: 'start lost'};
+  const mut = R.mrna.slice(0, m1 - 1) + alt + R.mrna.slice(m2), P = R.prot;
+  let Mu = ''; for (let k = cS - 1; k + 2 < mut.length; k += 3) { const a = tr1(mut.slice(k, k + 3)); Mu += a; if (a === '*') break; }
+  const A = k => AA3[P[k]] + (k + 1), three = x => [...x].map(c => AA3[c] || 'Xaa').join('');
+  let i = 0; while (i < P.length && i < Mu.length && P[i] === Mu[i]) i++;
+  if (i >= P.length) return {p: `p.(=)`, type: fs ? 'frameshift at the stop codon (stop retained)' : 'synonymous'};
+  const stopAt = Mu.indexOf('*', i), toStop = stopAt < 0 ? '?' : stopAt - i + 1;
+  if (Mu[i] === '*') return {p: `p.(${A(i)}Ter)`, type: fs ? 'frameshift' : 'stop gained'};
+  if (P[i] === '*') return {p: `p.(Ter${i + 1}${AA3[Mu[i]]}extTer${toStop})`, type: 'stop lost'};
+  if (fs) return {p: `p.(${A(i)}${AA3[Mu[i]]}fsTer${toStop})`, type: 'frameshift'};
+  // in-frame: trim the common suffix, then name the protein change
+  let j = 0; while (j < P.length - i && j < Mu.length - i && P[P.length - 1 - j] === Mu[Mu.length - 1 - j]) j++;
+  const delP = P.slice(i, P.length - j); let insM = Mu.slice(i, Mu.length - j);
+  if (stopAt < 0) return {p: `p.(${A(i)}_Ter${P.length}delins${three(insM)}extTer?)`, type: 'stop lost'};
+  if (insM.includes('*')) { insM = insM.slice(0, insM.indexOf('*') + 1); return {p: delP.length > 1 ? `p.(${A(i)}_${A(i + delP.length - 1)}delins${three(insM)})` : delP.length ? `p.(${A(i)}delins${three(insM)})` : `p.(${A(i - 1)}_${A(i)}ins${three(insM)})`, type: 'stop gained'}; }
+  if (!delP.length) {   // insertion: shift 3′, then check for a duplication
+    let a = i; while (a < P.length - 1 && P[a] === insM[0]) { insM = insM.slice(1) + insM[0]; a++; }
+    const n = insM.length;
+    if (a - n >= 0 && P.slice(a - n, a) === insM) return {p: n === 1 ? `p.(${A(a - 1)}dup)` : `p.(${A(a - n)}_${A(a - 1)}dup)`, type: `in-frame ${nk}`};
+    return {p: `p.(${A(a - 1)}_${A(a)}ins${three(insM)})`, type: `in-frame ${nk}`};
+  }
+  if (!insM.length) {   // deletion: shift 3′
+    const n = delP.length; let a = i; while (a + n < P.length - 1 && P[a] === P[a + n]) a++;
+    return {p: n === 1 ? `p.(${A(a)}del)` : `p.(${A(a)}_${A(a + n - 1)}del)`, type: `in-frame ${nk}`};
+  }
+  if (delP.length === 1 && insM.length === 1) return {p: `p.(${A(i)}${AA3[insM]})`, type: v.kind === 'snv' ? 'missense' : `in-frame ${nk} (missense)`};
+  return {p: delP.length === 1 ? `p.(${A(i)}delins${three(insM)})` : `p.(${A(i)}_${A(i + delP.length - 1)}delins${three(insM)})`, type: `in-frame ${nk}`};
+}
+
 /* local consequence prediction */
 function consequence(v) {
   const rg = region(v.s);
@@ -842,14 +977,15 @@ function consequence(v) {
     if (cn === 1 && a === 'M' && b !== 'M') Object.assign(out, {p: 'p.(Met1?)', type: 'start lost'});
     else if (a === b) Object.assign(out, {p: `p.(${AA3[a]}${cn}=)`, type: 'synonymous'});
     else if (b === '*') Object.assign(out, {p: `p.(${AA3[a]}${cn}Ter)`, type: 'nonsense'});
-    else if (a === '*') Object.assign(out, {p: `p.(Ter${cn}${AA3[b]}extTer?)`, type: 'stop lost'});
+    else if (a === '*') Object.assign(out, {p: protEffect(v)?.p || `p.(Ter${cn}${AA3[b]}extTer?)`, type: 'stop lost'});
     else Object.assign(out, {p: `p.(${AA3[a]}${cn}${AA3[b]})`, type: 'missense'});
     // exonic splice region (within 3 nt of an internal exon edge)
     const k = exonAt(v.s), e = R.exons[k];
     if ((k > 0 && v.s - e.s < 3) || (k < R.exons.length - 1 && e.e - v.s < 3)) out.effect = 'exonic splice region';
   } else if (v.kind !== 'snv' && [v.s, v.e].some(i => isCoding(i))) {
-    const d = v.kind === 'del' ? -(v.e - v.s + 1) : v.kind === 'dup' || v.kind === 'ins' ? v.alt.length : v.alt.length - v.ref.length;
-    out.type = d % 3 ? 'frameshift' : (v.kind === 'del' ? 'in-frame deletion' : v.kind === 'delins' ? 'in-frame delins' : 'in-frame insertion');
+    const pe = protEffect(v);
+    if (pe) Object.assign(out, pe);
+    else out.type = 'crosses an exon/intron junction';   // length change is not a clean coding change: assess splicing
     out.effect = splice();
   } else if (rg.kind === 'intron') { out.type = splice() || 'intronic'; }
   else if (rg.kind === 'exon') out.type = rg.sub === 'utr5' ? "5′UTR" : "3′UTR";
@@ -878,11 +1014,12 @@ function computeVariants() {
     if (e.mixed && e.kind === 'snv' && e.zyg === 'het') continue; // suppressed inside mixed traces
     let v = map.get(e.hgvs);
     if (!v) { v = {key: R.tx + ':' + e.hgvs, hgvs: e.hgvs, kind: e.kind, s: e.s, e: e.e, ref: e.ref, alt: e.alt, sup: [], other: []}; map.set(e.hgvs, v); }
-    if (!v.sup.some(s => s.r === r)) v.sup.push({r, zyg: e.zyg, q: e.q, ratio: e.ratio, edge: e.edge, twoAlt: e.twoAlt, rawI: e.rawI, mixed: e.mixed, adj: e.adj});
+    if (!v.sup.some(s => s.r === r)) v.sup.push({r, zyg: e.zyg, q: e.q, ratio: e.ratio, edge: e.edge, twoAlt: e.twoAlt, rawI: e.rawI, mixed: e.mixed, adj: e.adj, hetIndel: e.hetIndel, fit: e.fit, nPos: e.nPos});
   }
   for (const v of map.values()) {
     for (const r of reads) {
       if (v.sup.some(s => s.r === r)) continue;
+      const z = r.res.het?.zone; if (z && v.s >= z[0] && v.s <= z[1]) continue;   // two-allele mixture there: this read cannot judge
       let cov = true; for (let i = v.s; i <= v.e; i++) if (!readCovers(r, i)) { cov = false; break; }
       if (cov) v.other.push({r, base: baseAt(r, v.s), alt: v.kind === 'snv' ? altPeak(r, v.s, v.alt) : null});
     }
@@ -899,6 +1036,8 @@ function computeVariants() {
     if (v.sup.every(s => s.edge)) f.push({t: 'read edge', c: ''});
     if (v.sup.some(s => s.twoAlt)) f.push({t: 'IUPAC code excludes reference base', c: 'r'});
     if (v.sup.some(s => s.mixed)) f.push({t: 'inside mixed-trace region', c: 'r'});
+    const hi = v.sup.find(s => s.hetIndel);
+    if (hi) f.push({t: `het indel from trace deconvolution (${Math.round(hi.fit * 100)}% of ${hi.nPos} positions fit)`, c: 'g'});
     if (v.sup.some(s => s.adj)) f.push({t: 'next to another change — HGVS: one delins if in cis', c: 'g'});
     const qs = v.sup.map(s => s.q).filter(q => q != null);
     if (qs.length && Math.max(...qs) < 20 && v.zyg !== 'het') f.push({t: `low quality (Q${Math.max(...qs)})`, c: ''});
@@ -909,6 +1048,7 @@ function computeVariants() {
     VARS.push(v);
   }
   VARS.sort((a, b) => a.s - b.s || a.hgvs.localeCompare(b.hgvs));
+  checkNomenclature();
   if (ST.auto) for (const v of VARS) if (!ANN.has(v.key)) annotate(v.key);
 }
 
@@ -1020,23 +1160,70 @@ function genomicOf(v) {
 }
 
 /* ---- VariantValidator: many variants per call ---- */
-async function vvBatch(list) {
+// Returns one result per description: {st: 'done', valid, c, p, g, vcf, warn} (throws on network failure)
+async function vvQuery(hgvsList) {
+  const out = [];
+  for (let k = 0; k < hgvsList.length; k += 10) {
+    const chunk = hgvsList.slice(k, k + 10), desc = chunk.map(h => `${R.tx}:${h}`).join('|');
+    const d = await serial('vv', 1000, () => fetchRetry(`https://rest.variantvalidator.org/VariantValidator/variantvalidator/GRCh38/${encodeURIComponent(desc)}/${encodeURIComponent(R.tx)}?content-type=application%2Fjson`, {}, 'json', 3));
+    const entries = Object.entries(d).filter(([key]) => key !== 'flag' && key !== 'metadata').map(([, e]) => e);
+    for (const h of chunk) {
+      const e = entries.find(e => (e.submitted_variant || '').replace(/\s/g, '') === `${R.tx}:${h}`) || (entries.length === 1 && chunk.length === 1 ? entries[0] : null);
+      if (!e) { out.push({st: 'done', valid: false, warn: ['no result returned for this description']}); continue; }
+      const warn = (e.validation_warnings || []).filter(w => !/LRG/.test(w));
+      if (!e.hgvs_transcript_variant) { out.push({st: 'done', valid: false, warn: warn.length ? warn : ['invalid description']}); continue; }
+      const g38 = (e.primary_assembly_loci || {}).grch38 || {}, p = (e.hgvs_predicted_protein_consequence || {}).tlr || '';
+      out.push({st: 'done', valid: true, c: e.hgvs_transcript_variant.split(':').pop(), p: p.includes(':') ? p.split(':').pop() : p, g: g38.hgvs_genomic_description || '', vcf: g38.vcf || null, warn});
+    }
+  }
+  return out;
+}
+async function vvBatch(list) {   // annotation pipeline: reuse the nomenclature check when it already ran
+  const todo = [];
+  for (const x of list) { const n = NOM.get(x.v.key); if (n?.st === 'done') { if (n.valid) x.a.vv = n; else x.a.err.push('VariantValidator: ' + n.warn.join(' | ')); } else todo.push(x); }
+  if (!todo.length) return;
+  try {
+    const rs = await vvQuery(todo.map(x => x.v.hgvs));
+    todo.forEach((x, k) => { const n = rs[k]; setNom(x.v, n); if (n.valid) x.a.vv = n; else x.a.err.push('VariantValidator: ' + n.warn.join(' | ')); });
+  } catch (err) { todo.forEach(x => x.a.err.push('VariantValidator: ' + err.message)); }
+  refreshVars();
+}
+
+/* ---- Nomenclature check: every called variant goes to VariantValidator, whatever the annotation setting ---- */
+const NOM = new Map();   // variant key → {st: 'run' | 'done' | 'err', valid, c, p, g, warn, msg}
+const NOM_TTL = 30 * 864e5, NOM_Q = new Set(); let nomTimer = null;
+function setNom(v, n) { NOM.set(v.key, n); if (n.st === 'done') store('ssv-vv-' + v.key, {t: Date.now(), n}); }
+function checkNomenclature(force) {
+  for (const v of VARS) {
+    if (force === v.key) { NOM.delete(v.key); try { localStorage.removeItem('ssv-vv-' + v.key); } catch (e) {} }
+    if (NOM.has(v.key)) continue;   // failures are retried on demand (retry link)
+    const c = recall('ssv-vv-' + v.key);
+    if (c && Date.now() - c.t < NOM_TTL) { NOM.set(v.key, c.n); continue; }
+    NOM.set(v.key, {st: 'run'}); NOM_Q.add(v.key);
+  }
+  if (NOM_Q.size) { clearTimeout(nomTimer); nomTimer = setTimeout(flushNom, 250); }
+}
+async function flushNom() {
+  const tx = R.tx, list = [...NOM_Q].map(k => VARS.find(v => v.key === k)).filter(Boolean); NOM_Q.clear();
   for (let k = 0; k < list.length; k += 10) {
     const chunk = list.slice(k, k + 10);
-    const desc = chunk.map(x => `${R.tx}:${x.v.hgvs}`).join('|');
-    try {
-      const d = await serial('vv', 1000, () => fetchRetry(`https://rest.variantvalidator.org/VariantValidator/variantvalidator/GRCh38/${encodeURIComponent(desc)}/${encodeURIComponent(R.tx)}?content-type=application%2Fjson`, {}, 'json', 3));
-      const entries = Object.entries(d).filter(([key]) => key !== 'flag' && key !== 'metadata').map(([, e]) => e);
-      for (const x of chunk) {
-        const e = entries.find(e => (e.submitted_variant || '').replace(/\s/g, '') === `${R.tx}:${x.v.hgvs}`) || (entries.length === 1 && chunk.length === 1 ? entries[0] : null);
-        if (!e) { x.a.err.push('VariantValidator: no result'); continue; }
-        if (!e.hgvs_transcript_variant) { x.a.err.push('VariantValidator: ' + (e.validation_warnings || ['invalid']).join(' | ')); continue; }
-        const g38 = (e.primary_assembly_loci || {}).grch38 || {}, p = (e.hgvs_predicted_protein_consequence || {}).tlr || '';
-        x.a.vv = {c: e.hgvs_transcript_variant.split(':').pop(), p: p.includes(':') ? p.split(':').pop() : p, g: g38.hgvs_genomic_description || '', vcf: g38.vcf || null, warn: (e.validation_warnings || []).filter(w => !/LRG/.test(w))};
-      }
-    } catch (err) { chunk.forEach(x => x.a.err.push('VariantValidator: ' + err.message)); }
+    try { const rs = await vvQuery(chunk.map(v => v.hgvs)); if (R.tx !== tx) return; chunk.forEach((v, j) => setNom(v, rs[j])); }
+    catch (err) { if (R.tx !== tx) return; chunk.forEach(v => NOM.set(v.key, {st: 'err', msg: err.message})); }
     refreshVars();
   }
+}
+const vvOf = v => { const n = NOM.get(v.key); return n?.st === 'done' && n.valid ? n : ANN.get(v.key)?.vv || null; };
+const normP = p => String(p || '').replace(/^p\./, '').replace(/[()]/g, '').replace(/\*/g, 'Ter');
+// verdict comparing the local call with VariantValidator: {k: 'ok' | 'fix' | 'bad' | 'run' | 'off', txt}
+function nomVerdict(v) {
+  const n = NOM.get(v.key);
+  if (!n || n.st === 'run') return {k: 'run', txt: 'Checking with VariantValidator…'};
+  if (n.st === 'err') return {k: 'off', txt: `Not checked — VariantValidator unreachable (${n.msg})`};
+  if (!n.valid) return {k: 'bad', txt: `Rejected by VariantValidator: ${n.warn.join(' | ')}`};
+  const diffs = [];
+  if (n.c !== v.hgvs) diffs.push(`c.: local ${v.hgvs} → VV ${n.c}`);
+  if (v.p && n.p && normP(v.p) !== normP(n.p)) diffs.push(`p.: local ${v.p} → VV ${n.p}`);
+  return diffs.length ? {k: 'fix', txt: `Corrected by VariantValidator (${diffs.join('; ')})`} : {k: 'ok', txt: 'Confirmed by VariantValidator'};
 }
 
 /* ---- ClinVar: one OR-ed position search + one summary call for all variants ---- */
@@ -1278,7 +1465,7 @@ function renderCoverage() {
     sr.forEach((r, k) => { const x = r.res, yy = y + L[k] * 17, x1 = X(x.rs), x2 = X(x.re + 1), c = x.rev ? 'var(--orange)' : 'var(--accent)';
       h += `<g data-read="${r.id}" style="cursor:pointer"><rect x="${x1}" y="${yy}" width="${Math.max(2, x2 - x1)}" height="12" rx="3" fill="${c}"/>`;
       for (const [a, b] of x.mixRef) h += `<rect x="${X(a)}" y="${yy}" width="${Math.max(1.5, X(b + 1) - X(a))}" height="12" fill="var(--red)" opacity=".55"/>`;
-      for (const m of x.mixInfo) if (m.shift) { const mx = X(m.start); h += `<path d="M${mx} ${yy - 3} L${mx} ${yy + 15}" stroke="var(--red)" stroke-width="2.5"/><text x="${mx + (x.rev ? -4 : 4)}" y="${yy - 2}" text-anchor="${x.rev ? 'end' : 'start'}" style="fill:var(--red);font-weight:700">het indel?</text>`; }
+      for (const m of x.mixInfo) if (m.shift) { const mx = X(m.start); h += `<path d="M${mx} ${yy - 3} L${mx} ${yy + 15}" stroke="var(--red)" stroke-width="2.5"/><text x="${mx + (x.rev ? -4 : 4)}" y="${yy - 2}" text-anchor="${x.rev ? 'end' : 'start'}" style="fill:var(--red);font-weight:700">${m.call?.hgvs ? esc(m.call.hgvs) + ' het' : 'het indel?'}</text>`; }
       h += `<text x="${x1 + 4}" y="${yy + 9.5}" style="fill:#fff;font-weight:700">${esc(r.name)} ${x.rev ? '←' : '→'}</text><title>${esc(r.name)}: ${cRange(x.rs, x.re)} · ${(x.ident * 100).toFixed(1)}% identity</title></g>`; });
     y += (Math.max(...L) + 1) * 17 + 4;
   }
@@ -1357,17 +1544,20 @@ function renderVariants() {
   tb.innerHTML = VARS.map(v => {
     const a = ANN.get(v.key), u = UCLS.get(v.key) || {cls: '', note: ''};
     const [cv, gn, md] = annotCells(v);
-    const vvC = a?.vv?.c, vvP = a?.vv?.p;
+    const vv = vvOf(v), vvC = vv?.c, vvP = vv?.p, nv = nomVerdict(v);
     let hg = `<div class="hg">${esc(v.hgvs)}</div>`;
     if (vvC && vvC !== v.hgvs) hg += `<div class="vvn" title="VariantValidator normalised form">VV: ${esc(vvC)}</div>`;
-    const gTxt = a?.vv?.g || a?.g; if (gTxt) hg += `<div class="vvn">${esc(gTxt)}</div>`;
-    if (a?.vv?.g && a?.g && a.vv.g !== a.g) hg += `<div class="vvn" style="color:var(--orange)" title="Local genomic normalisation differs from VariantValidator: ${esc(a.g)}">local g. differs ⓘ</div>`;
-    if (a?.vv?.warn?.length) hg += `<div class="vvn" style="color:var(--orange)" title="${esc(a.vv.warn.join('\n'))}">VV warning ⓘ</div>`;
-    const prot = vvP || v.p || '—';
+    hg += `<div class="vvn">${nv.k === 'run' ? '<span class="spin"></span> VariantValidator…' : `<span class="bdg ${{ok: 'ok', fix: 'warn', bad: 'bad', off: 'warn'}[nv.k]}" title="${esc(nv.txt)}">${{ok: '✓ VV confirmed', fix: '⚠ VV corrected', bad: '✗ VV rejected', off: 'VV not checked'}[nv.k]}</span>`}${nv.k === 'off' || nv.k === 'bad' ? ` <a href="#" data-vvretry="${esc(v.key)}">retry</a>` : ''}</div>`;
+    const gLoc = a?.g || genomicOf(v).g, gTxt = vv?.g || gLoc; if (gTxt) hg += `<div class="vvn">${esc(gTxt)}</div>`;
+    if (vv?.g && gLoc && vv.g !== gLoc) hg += `<div class="vvn" style="color:var(--orange)" title="Local genomic normalisation differs from VariantValidator: ${esc(gLoc)}">local g. differs ⓘ</div>`;
+    if (vv?.warn?.length) hg += `<div class="vvn" style="color:var(--orange)" title="${esc(vv.warn.join('\n'))}">VV warning ⓘ</div>`;
+    let prot = esc(vvP || v.p || '—');
+    if (!vvP && v.p) prot += `<div class="vvn" title="Predicted locally from the transcript; VariantValidator has not confirmed it yet">local</div>`;
+    else if (vvP && v.p && normP(vvP) !== normP(v.p)) prot += `<div class="vvn" style="color:var(--orange)" title="Local prediction differs from VariantValidator">local: ${esc(v.p)}</div>`;
     const zyg = v.zyg === 'het' ? 'Het' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Hom/Hemi' : 'Hom') : '<span class="fl r">?</span>';
     const reads = v.sup.map(s => `<span title="${s.q != null ? 'Q' + s.q : ''}${s.ratio ? ` · secondary/primary ${(s.ratio * 100).toFixed(0)}%` : ''}">${esc(s.r.name)}${s.r.res.rev ? '←' : '→'}${s.ratio && s.zyg === 'het' ? ` <span class="muted">${Math.round(s.ratio * 100)}%</span>` : ''}</span>`).join('<br>');
     return `<tr class="vr ${SEL === v.key ? 'sel' : ''}" data-key="${esc(v.key)}">
-      <td>${hg}</td><td class="mono" style="white-space:nowrap">${esc(prot)}</td>
+      <td>${hg}</td><td class="mono" style="white-space:nowrap">${prot}</td>
       <td><div>${esc(v.loc)}</div><div class="small muted">${esc([v.type, v.effect].filter(Boolean).join(' · '))}</div></td>
       <td>${zyg}</td><td class="small">${reads}</td><td class="annot">${cv}</td><td class="annot">${gn}</td><td class="annot md">${md}</td>
       <td><div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div></td>
@@ -1388,7 +1578,8 @@ function renderFlags() {
     if (x.status !== 'ok') continue;
     for (const m of x.mixInfo) {
       const where = `${m.approx ? '~' : ''}c.${cLabel(m.start)}`, dirTxt = x.rev ? 'towards the 5′ end of the gene' : 'towards the 3′ end of the gene';
-      if (m.shift) out.push(['r', `${r.name}: heterozygous indel signature — from ${where} (${dirTxt}) the secondary peaks repeat the main sequence shifted by ${Math.abs(m.shift)} bp (${Math.round(m.frac * 100)}% of secondary peaks fit). Likely a heterozygous ${Math.abs(m.shift)}-bp insertion/deletion near ${where}${m.beyondTrim ? '; the read was quality-trimmed right there' : ''}. Confirm on the trace and with the opposite read; SNV calls in this stretch are suppressed.`]);
+      if (m.call?.hgvs) out.push(['r', `${r.name}: heterozygous ${m.call.hgvs} called by trace deconvolution — from ${where} (${dirTxt}) the trace is two alleles offset by ${Math.abs(m.shift)} bp (${m.shift > 0 ? 'deletion' : 'insertion'}); ${Math.round(m.call.fit * 100)}% of ${m.call.nPos} positions fit, second allele ≈ ${Math.round((m.call.ratio || 0) * 100)}% of reference peak height. Confirm with the opposite read; other calls in this stretch are suppressed.`]);
+      else if (m.shift) out.push(['r', `${r.name}: heterozygous indel signature — from ${where} (${dirTxt}) the secondary peaks repeat the main sequence shifted by ${Math.abs(m.shift)} bp (${Math.round(m.frac * 100)}% of secondary peaks fit). Likely a heterozygous ${Math.abs(m.shift)}-bp insertion/deletion near ${where}${m.beyondTrim ? '; the read was quality-trimmed right there' : ''}. Confirm on the trace and with the opposite read; SNV calls in this stretch are suppressed.`]);
       else out.push(['', `${r.name}: mixed/overlapping trace from ${where} — no consistent indel shift found (noise, contamination or several variants). Inspect the trace; heterozygous SNV calls in this stretch are suppressed.`]);
     }
     if (sigs.has(x.sig)) out.push(['', `${r.name} looks identical to ${sigs.get(x.sig)} (duplicate file?).`]); else sigs.set(x.sig, r.name);
@@ -1559,7 +1750,7 @@ async function exportXlsx() {
     const ws = wb.addWorksheet('Variants', {views: [{state: 'frozen', ySplit: 8}]});
     const today = new Date().toISOString().slice(0, 10);
     const cs = R.covStat || {n: R.coding.length, c1: 0, c2: 0};
-    const head = ['Patient', 'Gene', 'Transcript', 'HGVS c.', 'HGVS p.', 'Location', 'Zygosity', 'Variant type', 'Consequence', 'GRCh38 (g.)', 'dbSNP', 'ClinVar', 'ClinVar review', 'gnomAD v4 AF', 'REVEL', 'AlphaMissense', 'CADD phred', 'SpliceAI max Δ', 'MobiDetails', 'Supporting reads', 'Flags', 'Classification', 'Notes'];
+    const head = ['Patient', 'Gene', 'Transcript', 'HGVS c.', 'HGVS p.', 'Nomenclature check (VariantValidator)', 'Location', 'Zygosity', 'Variant type', 'Consequence', 'GRCh38 (g.)', 'dbSNP', 'ClinVar', 'ClinVar review', 'gnomAD v4 AF', 'REVEL', 'AlphaMissense', 'CADD phred', 'SpliceAI max Δ', 'MobiDetails', 'Supporting reads', 'Flags', 'Classification', 'Notes'];
     const LAST = String.fromCharCode(64 + head.length), CLS_COL = head.indexOf('Classification') + 1;
     const reads = goodReads();
     const meta = [
@@ -1579,10 +1770,10 @@ async function exportXlsx() {
     const kindName = {snv: 'SNV', del: 'Deletion', ins: 'Insertion', dup: 'Duplication', delins: 'Delins'};
     for (const v of inc) {
       const a = ANN.get(v.key) || {}, u = UCLS.get(v.key) || {cls: '', note: ''};
-      const cv = a.cv?.exact;
+      const cv = a.cv?.exact, vv = vvOf(v);
       const row = ws.getRow(rn++);
-      row.values = [patient, R.symbol, R.tx, a.vv?.c || v.hgvs, a.vv?.p || v.p || '', v.loc, v.zyg === 'het' ? 'Heterozygous' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Homozygous/hemizygous' : 'Homozygous') : 'Discordant between reads',
-        kindName[v.kind] || v.kind, [v.type, v.effect].filter(Boolean).join('; '), a.vv?.g || a.g || genomicOf(v).g, cv?.rs || a.gn?.rs || '',
+      row.values = [patient, R.symbol, R.tx, vv?.c || v.hgvs, vv?.p || v.p || '', nomVerdict(v).txt, v.loc, v.zyg === 'het' ? 'Heterozygous' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Homozygous/hemizygous' : 'Homozygous') : 'Discordant between reads',
+        kindName[v.kind] || v.kind, [v.type, v.effect].filter(Boolean).join('; '), vv?.g || a.g || genomicOf(v).g, cv?.rs || a.gn?.rs || '',
         cv ? cv.cls : (a.cv ? 'Not in ClinVar' : 'not queried'), cv ? `${cv.review} (${cv.stars}★) ${cv.acc}` : '', a.gn ? (a.gn.found ? fmtAF(a.gn.af) + ` (${a.gn.ac}/${a.gn.an}${a.gn.hom ? ', ' + a.gn.hom + ' hom' : ''})` : 'absent') : '',
         a.md?.revel ?? '', a.md?.am != null ? `${a.md.am}${a.md.amPred ? ' (' + a.md.amPred + ')' : ''}` : '', a.md?.cadd ?? '', a.md?.sai ?? '', a.md?.id ? {text: `MD ${a.md.id}`, hyperlink: a.md.url} : (a.md?.absent ? 'not in MD' : ''),
         v.sup.map(s => `${s.r.name}${s.r.res.rev ? '←' : '→'}`).join(', '), v.flags.map(f => f.t).join('; '), CLS_NAME[u.cls] && u.cls ? CLS_NAME[u.cls] : 'Not classified', u.note || ''];
@@ -1592,15 +1783,15 @@ async function exportXlsx() {
     }
     if (!inc.length) {
       const row = ws.getRow(rn++);
-      row.values = [patient, R.symbol, R.tx, '—', '—', reads.map(r => cRange(r.res.rs, r.res.re)).join('; '), '—', '—', 'No variant detected', '', '', '', '', '', '', '', '', '', '', reads.map(r => r.name).join(', '), '', 'Wild-type', ''];
+      row.values = [patient, R.symbol, R.tx, '—', '—', '', reads.map(r => cRange(r.res.rs, r.res.re)).join('; '), '—', '—', 'No variant detected', '', '', '', '', '', '', '', '', '', '', reads.map(r => r.name).join(', '), '', 'Wild-type', ''];
       const c = row.getCell(CLS_COL); c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: XFILL.WT[0]}}; c.font = {bold: true, color: {argb: XFILL.WT[1]}};
     }
-    [16, 9, 13, 26, 22, 18, 13, 12, 22, 30, 13, 22, 30, 18, 8, 16, 8, 9, 11, 20, 30, 18, 26].forEach((w, k) => ws.getColumn(k + 1).width = w);
+    [16, 9, 13, 26, 22, 30, 18, 13, 12, 22, 30, 13, 22, 30, 18, 8, 16, 8, 9, 11, 20, 30, 18, 26].forEach((w, k) => ws.getColumn(k + 1).width = w);
     ws.autoFilter = {from: 'A8', to: `${LAST}${Math.max(9, rn - 1)}`};
     // coverage sheet
     const w2 = wb.addWorksheet('Reads & coverage');
     w2.addRow(['Read', 'Source', 'Orientation', 'Aligned region', 'Length aligned', 'Identity', 'Amplicon', 'Mixed-trace regions']).font = {bold: true};
-    for (const r of READS) { const x = r.res; if (!x) continue; w2.addRow([r.name, r.ab ? 'AB1' : 'text', x.status === 'ok' ? (x.rev ? 'reverse' : 'forward') : x.status, x.status === 'ok' ? cRange(x.rs, x.re) : '', x.status === 'ok' ? x.re - x.rs + 1 : '', x.status === 'ok' ? (x.ident * 100).toFixed(1) + '%' : '', ampOf(r)?.name || '', (x.mixInfo || []).map(m => `${m.approx ? '~' : ''}c.${cLabel(m.start)}${m.shift ? ` (het indel, shift ${Math.abs(m.shift)} bp)` : ' (mixed)'}`).join('; ')]); }
+    for (const r of READS) { const x = r.res; if (!x) continue; w2.addRow([r.name, r.ab ? 'AB1' : 'text', x.status === 'ok' ? (x.rev ? 'reverse' : 'forward') : x.status, x.status === 'ok' ? cRange(x.rs, x.re) : '', x.status === 'ok' ? x.re - x.rs + 1 : '', x.status === 'ok' ? (x.ident * 100).toFixed(1) + '%' : '', ampOf(r)?.name || '', (x.mixInfo || []).map(m => `${m.approx ? '~' : ''}c.${cLabel(m.start)}${m.call?.hgvs ? ` (het ${m.call.hgvs})` : m.shift ? ` (het indel, shift ${Math.abs(m.shift)} bp)` : ' (mixed)'}`).join('; ')]); }
     w2.addRow([]); w2.addRow(['Exon', 'Coding bp', 'Covered', 'Forward + reverse']).font = {bold: true};
     const cov = coverageArrays();
     for (const e of R.exons) { let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; } if (nc) w2.addRow([e.n, nc, `${k1} (${Math.round(k1 / nc * 100)}%)`, `${k2} (${Math.round(k2 / nc * 100)}%)`]); }
@@ -1672,6 +1863,7 @@ function bind() {
   const vt = $('#varTable');
   vt.addEventListener('click', e => {
     const ann = e.target.closest('[data-ann]'); if (ann) { e.stopPropagation(); annotate(ann.dataset.ann); return; }
+    const vr = e.target.closest('[data-vvretry]'); if (vr) { e.preventDefault(); e.stopPropagation(); checkNomenclature(vr.dataset.vvretry); refreshVars(); return; }
     const rt = e.target.closest('[data-retry]'); if (rt) { e.preventDefault(); e.stopPropagation(); annotate(rt.dataset.retry, true); return; }
     if (e.target.closest('select,input,a,details')) return;
     const tr = e.target.closest('tr.vr'); if (!tr) return; const v = VARS.find(x => x.key === tr.dataset.key); if (!v) return;
