@@ -221,7 +221,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
         <button class="btn dark" id="exportBtn">Export Excel</button>
         <button class="btn ghost" id="clearBtn">New patient (clear reads)</button>
       </div>
-      <p class="hint">Reads, traces and the patient name never leave this browser. Only variant descriptions (e.g. <span class="mono">NM_000551.4:c.191G&gt;C</span>) and genomic coordinates are sent to VariantValidator, NCBI ClinVar, gnomAD and MobiDetails.</p>
+      <p class="hint">Reads, traces and the patient name never leave this browser. Only variant descriptions (e.g. <span class="mono">NM_000551.4:c.191G&gt;C</span>) and genomic coordinates are sent to VariantValidator, NCBI ClinVar, GeneBe, gnomAD and MobiDetails.</p>
       <div id="sumBox" class="stats" style="margin:6px 0 0"></div>
     </section>
   </div>
@@ -261,7 +261,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
 
   <section class="card">
     <h2><span class="n">6</span>Variants<span class="rt" id="varState"></span></h2>
-    <div class="tbl"><table id="varTable"><thead><tr><th>HGVS c.</th><th>Protein</th><th>Location / effect</th><th>Zyg.</th><th>Reads</th><th>ClinVar</th><th>gnomAD v4</th><th>MobiDetails</th><th>Flags</th><th>Your class</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+    <div class="tbl"><table id="varTable"><thead><tr><th>HGVS c.</th><th>Protein</th><th>Location / effect</th><th>Zyg.</th><th>Reads</th><th>ClinVar</th><th>GeneBe</th><th>gnomAD v4</th><th>MobiDetails</th><th>Flags</th><th>Your class</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
     <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
     <div id="flags" class="flagsbox"></div>
   </section>
@@ -298,7 +298,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
   </section>
 </main>
 <footer>
-  References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more). Heterozygous SNVs are called from secondary-peak ratios; heterozygous deletions, insertions and duplications (up to 30 bp) are called by deconvolving the two-allele trace against the reference. Every call is checked against VariantValidator and must be confirmed on the trace. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out). For laboratory use with expert review.
+  References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, GeneBe, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more). Heterozygous SNVs are called from secondary-peak ratios; heterozygous deletions, insertions and duplications (up to 30 bp) are called by deconvolving the two-allele trace against the reference. Every call is checked against VariantValidator and must be confirmed on the trace. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out). For laboratory use with expert review.
 </footer>
 
 <dialog id="settingsDlg">
@@ -310,12 +310,14 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
     <div class="row"><input type="checkbox" id="sTrim"><input type="number" id="sTrimQ" class="inp" style="width:64px" min="5" max="40"> Q</div>
     <div>Read-edge zone (bp)<small>Variants this close to an alignment end are flagged.</small></div>
     <input type="number" id="sEdge" class="inp" style="width:70px" min="0" max="50">
-    <div>Annotate variants automatically<small>ClinVar → gnomAD → MobiDetails, queued to respect rate limits. The VariantValidator nomenclature check always runs.</small></div>
+    <div>Annotate variants automatically<small>ClinVar → GeneBe → gnomAD → MobiDetails, queued to respect rate limits. The VariantValidator nomenclature check always runs.</small></div>
     <input type="checkbox" id="sAuto">
     <div>NCBI API key (optional)<small>Raises the NCBI limit from 3 to 10 requests/s. Stored only in this browser.</small></div>
     <input type="password" id="sKey" class="inp" style="width:180px" autocomplete="off">
     <div>MobiDetails API key (optional)<small>Free MobiDetails account → profile page. Needed only to create variants MobiDetails doesn't have yet. Stored only in this browser.</small></div>
     <input type="password" id="sMdKey" class="inp" style="width:180px" autocomplete="off">
+    <div>GeneBe account (optional)<small>Username (e-mail) and API key from your GeneBe profile. Raises the anonymous daily query limit. Stored only in this browser.</small></div>
+    <div class="row"><input type="text" id="sGbUser" class="inp" style="width:140px" placeholder="username" autocomplete="off"><input type="password" id="sGbKey" class="inp" style="width:140px" placeholder="API key" autocomplete="off"></div>
     <div>Annotation cache<small>Results are reused for 7 days. Clear to force fresh ClinVar / gnomAD / MobiDetails data.</small></div>
     <button class="btn sm ghost" id="sClearCache" type="button">Clear cache</button>
   </div>
@@ -350,7 +352,7 @@ const tr1 = c => CODON[c] || 'X';
 function translate(s) { let p = ''; for (let i = 0; i + 2 < s.length; i += 3) p += tr1(s.slice(i, i + 3)); return p; }
 
 /* ---------------- settings & state ---------------- */
-const DEF = {het: 0.30, trim: true, trimQ: 20, edge: 10, auto: true, ncbiKey: '', mdKey: '', width: 100, dots: false, view: 'reads'};
+const DEF = {het: 0.30, trim: true, trimQ: 20, edge: 10, auto: true, ncbiKey: '', mdKey: '', gbUser: '', gbKey: '', width: 100, dots: false, view: 'reads'};
 const ST = Object.assign({}, DEF, recall('ssv-settings') || {});
 const saveSettings = () => store('ssv-settings', ST);
 
@@ -1271,6 +1273,39 @@ async function clinvarBatch(list) {
   } catch (err) { list.forEach(x => { if (!x.a.cv) x.a.err.push('ClinVar: ' + err.message); }); }
 }
 
+/* ---- GeneBe: automatic ACMG classification + aggregated (ClinVar & community) classification ---- */
+const GB = 'https://api.genebe.net/cloud/api-public/v1/variants';
+const gbUrl = vcf => `https://genebe.net/variant/hg38/chr${vcf.chr}-${vcf.pos}-${vcf.ref}-${vcf.alt}`;
+const gbTxt = c => String(c || '').replace(/_/g, ' ').trim();
+async function genebeBatch(list) {
+  for (let k = 0; k < list.length; k += 100) {
+    const chunk = list.slice(k, k + 100);
+    try {
+      const headers = {'content-type': 'application/json', accept: 'application/json'};
+      if (ST.gbUser && ST.gbKey) headers.authorization = 'Basic ' + btoa(`${ST.gbUser}:${ST.gbKey}`);
+      const body = JSON.stringify(chunk.map(x => ({chr: x.loc.vcf.chr, pos: x.loc.vcf.pos, ref: x.loc.vcf.ref, alt: x.loc.vcf.alt})));
+      const d = await serial('gb', 1000, () => fetchRetry(`${GB}?genome=hg38&useEnsembl=false`, {method: 'POST', headers, body}, 'json', 3));
+      const vs = d.variants || [];
+      chunk.forEach((x, n) => {
+        const r = vs[n] || {}, url = gbUrl(x.loc.vcf);
+        x.a.gb = {url, acmg: gbTxt(r.acmg_classification), score: r.acmg_score ?? null, crit: r.acmg_criteria || '', comb: gbTxt(r.pathogenicity_classification_combined), pheno: r.phenotype_combined || '', cv: gbTxt(r.clinvar_classification), cvDis: r.clinvar_disease || '', rs: r.dbsnp || ''};
+      });
+    } catch (err) { chunk.forEach(x => { x.a.gb = {url: gbUrl(x.loc.vcf), failed: true}; x.a.err.push('GeneBe: ' + err.message); }); }
+    refreshVars();
+  }
+}
+const gbExport = g => !g ? 'not queried' : g.failed ? {text: 'not loaded — see GeneBe', hyperlink: g.url} : {text: [g.comb ? `Classification: ${g.comb}${g.pheno ? ' (' + g.pheno + ')' : ''}` : 'No submitted classification', g.acmg ? `ACMG auto: ${g.acmg}${g.score != null ? ` (${g.score} pts)` : ''}${g.crit ? ' — ' + g.crit : ''}` : ''].filter(Boolean).join('; '), hyperlink: g.url};
+function gbCell(a, run) {
+  const g = a.gb;
+  if (!g) return run ? '<span class="spin"></span>' : '<span class="muted">—</span>';
+  const link = `<a href="${esc(g.url)}" target="_blank" rel="noopener">GeneBe</a>`;
+  if (g.failed) return `${link}<div class="small muted">not loaded — open the page</div>`;
+  let h = g.comb ? cvClassChip(g.comb) + (g.pheno ? `<div class="vvn" style="font-family:var(--sans)" title="${esc(g.pheno)}">${esc(g.pheno.length > 60 ? g.pheno.slice(0, 60) + '…' : g.pheno)}</div>` : '') : '<span class="muted small">no submitted classification</span>';
+  if (g.acmg) h += `<div class="small" title="GeneBe automatic ACMG classification${g.crit ? ': ' + esc(g.crit) : ''}">ACMG auto: <b>${esc(g.acmg)}</b>${g.score != null ? ` (${g.score} pts)` : ''}</div>${g.crit ? `<div class="vvn">${esc(g.crit.replace(/,/g, ', '))}</div>` : ''}`;
+  if (g.cv && (!a.cv?.exact)) h += `<div class="small" style="color:var(--orange)" title="${esc(g.cvDis)}">ClinVar (via GeneBe): ${esc(g.cv)}</div>`;
+  return h + `<div class="small">${link}</div>`;
+}
+
 /* ---- gnomAD v4: all variants in one GraphQL request (aliases) ---- */
 async function gnomadBatch(list) {
   for (let k = 0; k < list.length; k += 30) {
@@ -1329,12 +1364,12 @@ async function mdBatch(list) {   // 3 variants in flight at a time
 }
 
 /* ---- orchestration ---- */
-const annKey = v => `ssv-ann2-${v.key}`;
+const annKey = v => `ssv-ann3-${v.key}`;
 let annTimer = null; const PENDING = new Set();
 function annotate(key, force = false) {
   if (!force && ANN.has(key)) return;
-  if (force) { try { localStorage.removeItem('ssv-ann2-' + key); } catch (e) {} }
-  ANN.set(key, {st: 'run', vv: null, cv: null, gn: null, md: null, err: []});
+  if (force) { try { localStorage.removeItem(annKey({key})); } catch (e) {} }
+  ANN.set(key, {st: 'run', vv: null, cv: null, gb: null, gn: null, md: null, err: []});
   PENDING.add(key); clearTimeout(annTimer); annTimer = setTimeout(flushAnnot, 200);
   refreshVars();
 }
@@ -1348,11 +1383,11 @@ async function flushAnnot() {
   }
   PENDING.clear(); refreshVars();
   if (!list.length) return;
-  await Promise.allSettled([vvBatch(list), clinvarBatch(list), gnomadBatch(list), mdBatch(list)]);
+  await Promise.allSettled([vvBatch(list), clinvarBatch(list), genebeBatch(list), gnomadBatch(list), mdBatch(list)]);
   if (R.tx !== tx) return;
   for (const x of list) {
     x.a.st = 'done'; x.a.g = x.loc.g;
-    if (!x.a.err.length) store(annKey(x.v), {t: Date.now(), a: {vv: x.a.vv, cv: x.a.cv, gn: x.a.gn, md: x.a.md, g: x.loc.g}});
+    if (!x.a.err.length) store(annKey(x.v), {t: Date.now(), a: {vv: x.a.vv, cv: x.a.cv, gb: x.a.gb, gn: x.a.gn, md: x.a.md, g: x.loc.g}});
   }
   refreshVars();
 }
@@ -1500,7 +1535,7 @@ function cvClassChip(cls) { const c = /pathogenic/i.test(cls) && !/conflict/i.te
 function fmtAF(af) { if (af === 0) return '0'; if (af >= 0.01) return (af * 100).toFixed(2) + '%'; return af.toExponential(2); }
 function annotCells(v) {
   const a = ANN.get(v.key);
-  if (!a) return [`<button class="btn sm ghost" data-ann="${esc(v.key)}">Annotate</button>`, '', ''];
+  if (!a) return [`<button class="btn sm ghost" data-ann="${esc(v.key)}">Annotate</button>`, '', '', ''];
   const run = a.st === 'run';
   let cv = '';
   if (a.cv?.exact) { const x = a.cv.exact; cv = `${cvClassChip(x.cls)} <span title="${esc(x.review)}">${'★'.repeat(x.stars)}${'☆'.repeat(4 - x.stars)}</span><br><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/${x.uid}/" target="_blank" rel="noopener">${esc(x.acc || 'VCV')}</a>${x.rs ? ` · <a href="https://www.ncbi.nlm.nih.gov/snp/${x.rs}" target="_blank" rel="noopener">${x.rs}</a>` : ''}${x.traits.length ? `<div class="vvn" style="font-family:var(--sans)">${esc(x.traits.join('; '))}</div>` : ''}`; }
@@ -1515,7 +1550,7 @@ function annotCells(v) {
   else gn = '<span class="muted">—</span>';
   if (a.err.length) cv += `<div class="small" style="color:var(--red)" title="${esc(a.err.join('\n'))}">⚠ ${esc(a.err.map(e => e.split(':')[0]).join(', '))} failed · <a href="#" data-retry="${esc(v.key)}">retry</a></div>`;
   else if (a.cachedAt) cv += `<div class="small muted">cached ${Math.max(0, Math.round((Date.now() - a.cachedAt) / 864e5))} d ago · <a href="#" data-retry="${esc(v.key)}">refresh</a></div>`;
-  return [cv, gn, mdCell(a, run)];
+  return [cv, gbCell(a, run), gn, mdCell(a, run)];
 }
 const PRED_CLS = p => /likely pathogenic|damaging|deleterious|disease/i.test(p || '') ? 'sc-hi' : /ambiguous|possibly|uncertain/i.test(p || '') ? 'sc-mid' : /benign|tolerated|neutral|polymorphism/i.test(p || '') ? 'sc-lo' : '';
 const SAI_CLS = x => x == null ? '' : x >= 0.5 ? 'sc-hi' : x >= 0.2 ? 'sc-mid' : 'sc-lo';
@@ -1543,7 +1578,7 @@ function renderVariants() {
   $('#varState').innerHTML = VARS.length ? `${VARS.length} variant${VARS.length > 1 ? 's' : ''}${nAnn ? ` · <span class="spin"></span> annotating ${nAnn}` : ''}` : '';
   tb.innerHTML = VARS.map(v => {
     const a = ANN.get(v.key), u = UCLS.get(v.key) || {cls: '', note: ''};
-    const [cv, gn, md] = annotCells(v);
+    const [cv, gb, gn, md] = annotCells(v);
     const vv = vvOf(v), vvC = vv?.c, vvP = vv?.p, nv = nomVerdict(v);
     let hg = `<div class="hg">${esc(v.hgvs)}</div>`;
     if (vvC && vvC !== v.hgvs) hg += `<div class="vvn" title="VariantValidator normalised form">VV: ${esc(vvC)}</div>`;
@@ -1559,7 +1594,7 @@ function renderVariants() {
     return `<tr class="vr ${SEL === v.key ? 'sel' : ''}" data-key="${esc(v.key)}">
       <td>${hg}</td><td class="mono" style="white-space:nowrap">${prot}</td>
       <td><div>${esc(v.loc)}</div><div class="small muted">${esc([v.type, v.effect].filter(Boolean).join(' · '))}</div></td>
-      <td>${zyg}</td><td class="small">${reads}</td><td class="annot">${cv}</td><td class="annot">${gn}</td><td class="annot md">${md}</td>
+      <td>${zyg}</td><td class="small">${reads}</td><td class="annot">${cv}</td><td class="annot">${gb}</td><td class="annot">${gn}</td><td class="annot md">${md}</td>
       <td><div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div></td>
       <td><select class="cls" data-cls="${esc(v.key)}">${CLS_OPTS.map(([k, l]) => `<option value="${k}" ${u.cls === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
       <td><input class="note" data-note="${esc(v.key)}" value="${esc(u.note)}" placeholder="note"></td></tr>`;
@@ -1750,7 +1785,7 @@ async function exportXlsx() {
     const ws = wb.addWorksheet('Variants', {views: [{state: 'frozen', ySplit: 8}]});
     const today = new Date().toISOString().slice(0, 10);
     const cs = R.covStat || {n: R.coding.length, c1: 0, c2: 0};
-    const head = ['Patient', 'Gene', 'Transcript', 'HGVS c.', 'HGVS p.', 'Nomenclature check (VariantValidator)', 'Location', 'Zygosity', 'Variant type', 'Consequence', 'GRCh38 (g.)', 'dbSNP', 'ClinVar', 'ClinVar review', 'gnomAD v4 AF', 'REVEL', 'AlphaMissense', 'CADD phred', 'SpliceAI max Δ', 'MobiDetails', 'Supporting reads', 'Flags', 'Classification', 'Notes'];
+    const head = ['Patient', 'Gene', 'Transcript', 'HGVS c.', 'HGVS p.', 'Nomenclature check (VariantValidator)', 'Location', 'Zygosity', 'Variant type', 'Consequence', 'GRCh38 (g.)', 'dbSNP', 'ClinVar', 'ClinVar review', 'GeneBe', 'gnomAD v4 AF', 'REVEL', 'AlphaMissense', 'CADD phred', 'SpliceAI max Δ', 'MobiDetails', 'Supporting reads', 'Flags', 'Classification', 'Notes'];
     const LAST = String.fromCharCode(64 + head.length), CLS_COL = head.indexOf('Classification') + 1;
     const reads = goodReads();
     const meta = [
@@ -1773,8 +1808,8 @@ async function exportXlsx() {
       const cv = a.cv?.exact, vv = vvOf(v);
       const row = ws.getRow(rn++);
       row.values = [patient, R.symbol, R.tx, vv?.c || v.hgvs, vv?.p || v.p || '', nomVerdict(v).txt, v.loc, v.zyg === 'het' ? 'Heterozygous' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Homozygous/hemizygous' : 'Homozygous') : 'Discordant between reads',
-        kindName[v.kind] || v.kind, [v.type, v.effect].filter(Boolean).join('; '), vv?.g || a.g || genomicOf(v).g, cv?.rs || a.gn?.rs || '',
-        cv ? cv.cls : (a.cv ? 'Not in ClinVar' : 'not queried'), cv ? `${cv.review} (${cv.stars}★) ${cv.acc}` : '', a.gn ? (a.gn.found ? fmtAF(a.gn.af) + ` (${a.gn.ac}/${a.gn.an}${a.gn.hom ? ', ' + a.gn.hom + ' hom' : ''})` : 'absent') : '',
+        kindName[v.kind] || v.kind, [v.type, v.effect].filter(Boolean).join('; '), vv?.g || a.g || genomicOf(v).g, cv?.rs || a.gn?.rs || a.gb?.rs || '',
+        cv ? cv.cls : (a.cv ? 'Not in ClinVar' : 'not queried'), cv ? `${cv.review} (${cv.stars}★) ${cv.acc}` : '', gbExport(a.gb), a.gn ? (a.gn.found ? fmtAF(a.gn.af) + ` (${a.gn.ac}/${a.gn.an}${a.gn.hom ? ', ' + a.gn.hom + ' hom' : ''})` : 'absent') : '',
         a.md?.revel ?? '', a.md?.am != null ? `${a.md.am}${a.md.amPred ? ' (' + a.md.amPred + ')' : ''}` : '', a.md?.cadd ?? '', a.md?.sai ?? '', a.md?.id ? {text: `MD ${a.md.id}`, hyperlink: a.md.url} : (a.md?.absent ? 'not in MD' : ''),
         v.sup.map(s => `${s.r.name}${s.r.res.rev ? '←' : '→'}`).join(', '), v.flags.map(f => f.t).join('; '), CLS_NAME[u.cls] && u.cls ? CLS_NAME[u.cls] : 'Not classified', u.note || ''];
       row.eachCell(c => { c.alignment = {vertical: 'top', wrapText: true}; });
@@ -1783,10 +1818,10 @@ async function exportXlsx() {
     }
     if (!inc.length) {
       const row = ws.getRow(rn++);
-      row.values = [patient, R.symbol, R.tx, '—', '—', '', reads.map(r => cRange(r.res.rs, r.res.re)).join('; '), '—', '—', 'No variant detected', '', '', '', '', '', '', '', '', '', '', reads.map(r => r.name).join(', '), '', 'Wild-type', ''];
+      row.values = [patient, R.symbol, R.tx, '—', '—', '', reads.map(r => cRange(r.res.rs, r.res.re)).join('; '), '—', '—', 'No variant detected', '', '', '', '', '', '', '', '', '', '', '', reads.map(r => r.name).join(', '), '', 'Wild-type', ''];
       const c = row.getCell(CLS_COL); c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: XFILL.WT[0]}}; c.font = {bold: true, color: {argb: XFILL.WT[1]}};
     }
-    [16, 9, 13, 26, 22, 30, 18, 13, 12, 22, 30, 13, 22, 30, 18, 8, 16, 8, 9, 11, 20, 30, 18, 26].forEach((w, k) => ws.getColumn(k + 1).width = w);
+    [16, 9, 13, 26, 22, 30, 18, 13, 12, 22, 30, 13, 22, 30, 30, 18, 8, 16, 8, 9, 11, 20, 30, 18, 26].forEach((w, k) => ws.getColumn(k + 1).width = w);
     ws.autoFilter = {from: 'A8', to: `${LAST}${Math.max(9, rn - 1)}`};
     // coverage sheet
     const w2 = wb.addWorksheet('Reads & coverage');
@@ -1898,14 +1933,15 @@ function bind() {
   $('#regCopy').onclick = () => { const t = $('#regOut').textContent; if (t) copyText(t, 'Region copied'); };
   // settings
   const dlg = $('#settingsDlg');
-  $('#setBtn').onclick = () => { $('#sHet').value = ST.het; $('#sHetV').textContent = Math.round(ST.het * 100) + '%'; $('#sTrim').checked = ST.trim; $('#sTrimQ').value = ST.trimQ; $('#sEdge').value = ST.edge; $('#sAuto').checked = ST.auto; $('#sKey').value = ST.ncbiKey; $('#sMdKey').value = ST.mdKey || ''; dlg.showModal(); };
+  $('#setBtn').onclick = () => { $('#sHet').value = ST.het; $('#sHetV').textContent = Math.round(ST.het * 100) + '%'; $('#sTrim').checked = ST.trim; $('#sTrimQ').value = ST.trimQ; $('#sEdge').value = ST.edge; $('#sAuto').checked = ST.auto; $('#sKey').value = ST.ncbiKey; $('#sMdKey').value = ST.mdKey || ''; $('#sGbUser').value = ST.gbUser || ''; $('#sGbKey').value = ST.gbKey || ''; dlg.showModal(); };
   $('#sHet').oninput = e => { $('#sHetV').textContent = Math.round(e.target.value * 100) + '%'; };
   const applySet = () => { ST.het = +$('#sHet').value; ST.trim = $('#sTrim').checked; ST.trimQ = +$('#sTrimQ').value || 20; ST.edge = +$('#sEdge').value || 0; ST.auto = $('#sAuto').checked; ST.ncbiKey = $('#sKey').value.trim(); ST.mdKey = $('#sMdKey').value.trim(); saveSettings(); READS.forEach(processRead); refresh(); };
   ['sHet', 'sTrim', 'sTrimQ', 'sEdge', 'sAuto'].forEach(id => $('#' + id).addEventListener('change', applySet));
   $('#setClose').onclick = () => { applySet(); dlg.close(); };
   $('#sKey').addEventListener('change', () => { ST.ncbiKey = $('#sKey').value.trim(); saveSettings(); });
   $('#sMdKey').addEventListener('change', () => { ST.mdKey = $('#sMdKey').value.trim(); saveSettings(); });
-  $('#sClearCache').onclick = () => { let n = 0; try { for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if (/^ssv-(ann2|prod)-/.test(key)) { localStorage.removeItem(key); n++; } } } catch (e) {} toast(`Cleared ${n} cached entries`); };
+  ['sGbUser', 'sGbKey'].forEach(id => $('#' + id).addEventListener('change', () => { ST.gbUser = $('#sGbUser').value.trim(); ST.gbKey = $('#sGbKey').value.trim(); saveSettings(); }));
+  $('#sClearCache').onclick = () => { let n = 0; try { for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if (/^ssv-(ann\d|vv|prod)-/.test(key)) { localStorage.removeItem(key); n++; } } } catch (e) {} toast(`Cleared ${n} cached entries`); };
   window.addEventListener('beforeunload', e => { if (READS.length) { e.preventDefault(); e.returnValue = ''; } });
   window.addEventListener('resize', () => { if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); });
   renderRef(); renderCoverage(); renderPrimers();
