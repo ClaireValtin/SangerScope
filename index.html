@@ -1277,29 +1277,41 @@ async function clinvarBatch(list) {
 const GB = 'https://api.genebe.net/cloud/api-public/v1/variants';
 const gbUrl = vcf => `https://genebe.net/variant/hg38/chr${vcf.chr}-${vcf.pos}-${vcf.ref}-${vcf.alt}`;
 const gbTxt = c => String(c || '').replace(/_/g, ' ').trim();
+const gbRec = (x, r) => ({url: gbUrl(x.loc.vcf), acmg: gbTxt(r.acmg_classification), score: r.acmg_score ?? null, crit: r.acmg_criteria || '', comb: gbTxt(r.pathogenicity_classification_combined), pheno: r.phenotype_combined || '', cv: gbTxt(r.clinvar_classification), cvDis: r.clinvar_disease || '', rs: r.dbsnp || ''});
+// Batch POST first (JSON body → the browser sends a CORS preflight). If that is refused, fall back to the
+// single-variant GET endpoint: a plain GET without custom headers needs no preflight.
 async function genebeBatch(list) {
+  const auth = ST.gbUser && ST.gbKey ? {authorization: 'Basic ' + btoa(`${ST.gbUser}:${ST.gbKey}`)} : {};
   for (let k = 0; k < list.length; k += 100) {
     const chunk = list.slice(k, k + 100);
+    let postErr = null;
     try {
-      const headers = {'content-type': 'application/json', accept: 'application/json'};
-      if (ST.gbUser && ST.gbKey) headers.authorization = 'Basic ' + btoa(`${ST.gbUser}:${ST.gbKey}`);
       const body = JSON.stringify(chunk.map(x => ({chr: x.loc.vcf.chr, pos: x.loc.vcf.pos, ref: x.loc.vcf.ref, alt: x.loc.vcf.alt})));
-      const d = await serial('gb', 1000, () => fetchRetry(`${GB}?genome=hg38&useEnsembl=false`, {method: 'POST', headers, body}, 'json', 3));
+      const d = await serial('gb', 1000, () => fetchRetry(`${GB}?genome=hg38&useEnsembl=false`, {method: 'POST', headers: {'content-type': 'application/json', ...auth}, body}, 'json', 1));
       const vs = d.variants || [];
-      chunk.forEach((x, n) => {
-        const r = vs[n] || {}, url = gbUrl(x.loc.vcf);
-        x.a.gb = {url, acmg: gbTxt(r.acmg_classification), score: r.acmg_score ?? null, crit: r.acmg_criteria || '', comb: gbTxt(r.pathogenicity_classification_combined), pheno: r.phenotype_combined || '', cv: gbTxt(r.clinvar_classification), cvDis: r.clinvar_disease || '', rs: r.dbsnp || ''};
-      });
-    } catch (err) { chunk.forEach(x => { x.a.gb = {url: gbUrl(x.loc.vcf), failed: true}; x.a.err.push('GeneBe: ' + err.message); }); }
+      chunk.forEach((x, n) => { x.a.gb = gbRec(x, vs[n] || {}); });
+    } catch (err) { postErr = err; }
+    if (postErr) for (const x of chunk) {
+      const v = x.loc.vcf;
+      try {
+        const q = `chr=${encodeURIComponent(v.chr)}&pos=${v.pos}&ref=${v.ref}&alt=${v.alt}&genome=hg38&useEnsembl=false`;
+        const d = await serial('gb', 400, () => fetchRetry(`${GB.replace(/variants$/, 'variant')}?${q}`, {}, 'json', 2));
+        x.a.gb = gbRec(x, (d.variants || [])[0] || d);
+      } catch (err) {
+        const why = err.name === 'TypeError' ? 'blocked by the browser (CORS) or network' : err.message;
+        x.a.gb = {url: gbUrl(v), failed: true, why}; x.a.err.push(`GeneBe: ${why} (batch: ${postErr.message})`);
+      }
+      refreshVars();
+    }
     refreshVars();
   }
 }
-const gbExport = g => !g ? 'not queried' : g.failed ? {text: 'not loaded — see GeneBe', hyperlink: g.url} : {text: [g.comb ? `Classification: ${g.comb}${g.pheno ? ' (' + g.pheno + ')' : ''}` : 'No submitted classification', g.acmg ? `ACMG auto: ${g.acmg}${g.score != null ? ` (${g.score} pts)` : ''}${g.crit ? ' — ' + g.crit : ''}` : ''].filter(Boolean).join('; '), hyperlink: g.url};
+const gbExport = g => !g ? 'not queried' : g.failed ? {text: `not loaded (${g.why || 'error'}) — see GeneBe`, hyperlink: g.url} : {text: [g.comb ? `Classification: ${g.comb}${g.pheno ? ' (' + g.pheno + ')' : ''}` : 'No submitted classification', g.acmg ? `ACMG auto: ${g.acmg}${g.score != null ? ` (${g.score} pts)` : ''}${g.crit ? ' — ' + g.crit : ''}` : ''].filter(Boolean).join('; '), hyperlink: g.url};
 function gbCell(a, run) {
   const g = a.gb;
   if (!g) return run ? '<span class="spin"></span>' : '<span class="muted">—</span>';
   const link = `<a href="${esc(g.url)}" target="_blank" rel="noopener">GeneBe</a>`;
-  if (g.failed) return `${link}<div class="small muted">not loaded — open the page</div>`;
+  if (g.failed) return `${link}<div class="small muted" title="${esc(g.why || '')}">not loaded (${esc(g.why || 'error')}) — open the page</div>`;
   let h = g.comb ? cvClassChip(g.comb) + (g.pheno ? `<div class="vvn" style="font-family:var(--sans)" title="${esc(g.pheno)}">${esc(g.pheno.length > 60 ? g.pheno.slice(0, 60) + '…' : g.pheno)}</div>` : '') : '<span class="muted small">no submitted classification</span>';
   if (g.acmg) h += `<div class="small" title="GeneBe automatic ACMG classification${g.crit ? ': ' + esc(g.crit) : ''}">ACMG auto: <b>${esc(g.acmg)}</b>${g.score != null ? ` (${g.score} pts)` : ''}</div>${g.crit ? `<div class="vvn">${esc(g.crit.replace(/,/g, ', '))}</div>` : ''}`;
   if (g.cv && (!a.cv?.exact)) h += `<div class="small" style="color:var(--orange)" title="${esc(g.cvDis)}">ClinVar (via GeneBe): ${esc(g.cv)}</div>`;
