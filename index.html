@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script>try{const t=JSON.parse(localStorage.getItem('ssv-theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
 :root{
   --bg:#eceff0;--panel:#ffffff;--panel2:#f5f7f8;--ink:#14181b;--muted:#67727a;--line:#dce1e4;
@@ -20,12 +21,21 @@
   --sans:'Manrope',system-ui,-apple-system,Segoe UI,sans-serif;
   --r:12px;
 }
-@media (prefers-color-scheme:dark){:root{
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0c0f11;--panel:#151a1d;--panel2:#1b2024;--ink:#e5e9eb;--muted:#8d979e;--line:#283035;
   --head:#07090a;--accent:#2cc2bf;--accent-ink:#04110f;--accent-soft:#11302f;
   --green:#3cc47c;--green-soft:#123122;--orange:#f39a3a;--orange-soft:#38270f;
   --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;--bG:#d6d9db;
+  color-scheme:dark;
 }}
+:root[data-theme="dark"]{
+  --bg:#0c0f11;--panel:#151a1d;--panel2:#1b2024;--ink:#e5e9eb;--muted:#8d979e;--line:#283035;
+  --head:#07090a;--accent:#2cc2bf;--accent-ink:#04110f;--accent-soft:#11302f;
+  --green:#3cc47c;--green-soft:#123122;--orange:#f39a3a;--orange-soft:#38270f;
+  --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;--bG:#d6d9db;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{color-scheme:light}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -109,7 +119,11 @@ input.note{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--pan
 .ex.full{background:var(--green-soft);color:var(--green)}
 .ex.part{background:var(--orange-soft);color:var(--orange)}
 .ex.none{background:var(--red-soft);color:var(--red)}
+.ex.off{background:var(--panel2);color:var(--muted);opacity:.7}
 .ex:hover{border-color:currentColor}
+.tgt{display:grid;gap:6px;margin-top:10px}
+.tgt .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel2);cursor:pointer}
+.tgt .t:hover{border-color:var(--accent)}
 .svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
 #covSvg{display:block;min-width:900px;width:100%}
 #covSvg text{font-family:var(--sans);font-size:10px;fill:var(--muted)}
@@ -132,7 +146,6 @@ input.note{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--pan
 .k-cds{color:var(--ink);font-weight:700}
 .k-utr{color:var(--accent)}
 .k-in{color:var(--muted)}
-.k-pr{background:var(--orange-soft)}
 .k-v{background:var(--yellow-soft);outline:1px solid var(--yellow)}
 .k-cur{background:var(--accent)!important;color:var(--accent-ink)!important}
 .s-mm{background:var(--red);color:#fff;font-weight:700}
@@ -193,6 +206,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
     <div>SangerScope<br><small>Sanger variant analysis · runs entirely in your browser</small></div>
   </div>
   <div class="sp"></div>
+  <button class="hbtn" id="themeBtn" title="Switch between automatic, light and dark theme">Theme: auto</button>
   <button class="hbtn" id="setBtn">Settings</button>
 </header>
 
@@ -226,48 +240,45 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
     </section>
   </div>
 
-  <div class="grid2">
-    <section class="card">
-      <h2><span class="n">3</span>Reads<span class="rt" id="readCount"></span></h2>
-      <div class="drop" id="drop">
-        <strong>Drop AB1 / FASTA files here</strong>
-        <span class="muted small">or click to browse · .ab1 .abi .fasta .fa .fas .seq .txt · several at once</span>
-        <input type="file" id="fileInput" multiple hidden accept=".ab1,.abi,.ab,.fasta,.fa,.fas,.fna,.seq,.txt">
-      </div>
-      <details id="pasteDet">
-        <summary>Paste a sequence or FASTA</summary>
-        <input id="pasteName" class="inp" placeholder="Read name (used if no &gt;header), e.g. 2F" style="width:100%;margin-bottom:6px">
-        <textarea id="pasteBox" class="inp" rows="5" placeholder="&gt;1F&#10;ACGTRYKM... (IUPAC codes = heterozygous)"></textarea>
-        <div class="row" style="margin-top:6px"><button class="btn sm" id="pasteAdd">Add sequence</button><span class="muted small">Multi-FASTA allowed. R, Y, S, W, K, M are read as heterozygous.</span></div>
-      </details>
-      <div class="reads" id="readsList"></div>
-    </section>
-
-    <section class="card">
-      <h2><span class="n">4</span>Primers<span class="rt" id="primerState"></span></h2>
-      <textarea id="primerText" class="inp" rows="5" placeholder="One primer per line: name then sequence, e.g.&#10;EX1-F CGGGTGGAACCTTAGCGGA&#10;EX1-R GATAAGATTCCCACCTACTGGGC&#10;(F/R pairs are matched by name)"></textarea>
-      <div class="row" style="margin-top:6px"><button class="btn sm" id="primerBtn">Locate primers</button><span class="muted small">Saved in this browser for each gene.</span></div>
-      <div class="tbl" style="margin-top:10px"><table class="pt"><thead><tr><th>Amplicon</th><th>Size</th><th>Sequenced insert</th><th>Exons</th><th>Notes</th></tr></thead><tbody id="primerTable"></tbody></table></div>
-    </section>
-  </div>
+  <section class="card">
+    <h2><span class="n">3</span>Reads<span class="rt" id="readCount"></span></h2>
+    <div class="drop" id="drop">
+      <strong>Drop AB1 / FASTA files here</strong>
+      <span class="muted small">or click to browse · .ab1 .abi .fasta .fa .fas .seq .txt · several at once</span>
+      <input type="file" id="fileInput" multiple hidden accept=".ab1,.abi,.ab,.fasta,.fa,.fas,.fna,.seq,.txt">
+    </div>
+    <details id="pasteDet">
+      <summary>Paste a sequence or FASTA</summary>
+      <input id="pasteName" class="inp" placeholder="Read name (used if no &gt;header), e.g. 2F" style="width:100%;margin-bottom:6px">
+      <textarea id="pasteBox" class="inp" rows="5" placeholder="&gt;1F&#10;ACGTRYKM... (IUPAC codes = heterozygous)"></textarea>
+      <div class="row" style="margin-top:6px"><button class="btn sm" id="pasteAdd">Add sequence</button><span class="muted small">Multi-FASTA allowed. R, Y, S, W, K, M are read as heterozygous.</span></div>
+    </details>
+    <div class="reads" id="readsList"></div>
+  </section>
 
   <section class="card">
-    <h2><span class="n">5</span>Coverage<span class="rt">click the map to jump the alignment there</span></h2>
+    <h2><span class="n">4</span>Coverage<span class="rt">click the map to jump the alignment there</span></h2>
+    <div class="toolbar">
+      <label>Target <select id="covScope" class="inp"><option value="auto">Exons with reads</option><option value="cds">Whole CDS</option><option value="exons">Chosen exons</option></select></label>
+      <input id="covExons" class="inp mono" placeholder="exons, e.g. 3, 5-7" style="width:170px;display:none">
+      <input id="covPos" class="inp mono" placeholder="Key positions, e.g. 1799T&gt;A, 340+5" style="flex:1;min-width:220px" title="Positions you must see (familial variant, hotspot…). Each one gets a covered / genotype check. Saved per gene.">
+    </div>
     <div class="stats" id="covStats"></div>
     <div class="svgwrap"><svg id="covSvg" viewBox="0 0 1200 120" preserveAspectRatio="xMinYMin meet"></svg></div>
     <div class="chips" id="exonChips"></div>
     <div class="gaps" id="covGaps"></div>
+    <div class="tgt" id="covTargets"></div>
   </section>
 
   <section class="card">
-    <h2><span class="n">6</span>Variants<span class="rt" id="varState"></span></h2>
+    <h2><span class="n">5</span>Variants<span class="rt" id="varState"></span></h2>
     <div class="tbl"><table id="varTable"><thead><tr><th>HGVS c.</th><th>Protein</th><th>Location / effect</th><th>Zyg.</th><th>Reads</th><th>ClinVar</th><th>GeneBe</th><th>gnomAD v4</th><th>MobiDetails</th><th>Flags</th><th>Your class</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
     <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
     <div id="flags" class="flagsbox"></div>
   </section>
 
   <section class="card">
-    <h2><span class="n">7</span>Alignment<span class="rt">select &amp; copy works on the sequence lines · click an AB1 base to open its traces</span></h2>
+    <h2><span class="n">6</span>Alignment<span class="rt">select &amp; copy works on the sequence lines · click an AB1 base to open its traces</span></h2>
     <div class="toolbar">
       <label>Show <select id="viewMode" class="inp"><option value="reads">Read-covered regions</option><option value="exons">Coding exons ± 30 bp</option><option value="all">Whole gene</option></select></label>
       <label>Width <select id="blockW" class="inp"><option>60</option><option>80</option><option selected>100</option><option>120</option><option>150</option></select></label>
@@ -281,7 +292,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
   </section>
 
   <section class="card">
-    <h2><span class="n">8</span>Reference sequences</h2>
+    <h2><span class="n">7</span>Reference sequences</h2>
     <div class="tabs" id="refTabs"></div>
     <div class="row" style="margin-bottom:8px"><button class="btn sm" id="refCopy">Copy</button><button class="btn sm ghost" id="refCopyFa">Copy as FASTA</button><span class="muted small" id="refNote"></span></div>
     <div class="seqbox" id="refBox"><span class="muted">Load a gene to see its sequences.</span></div>
@@ -360,7 +371,6 @@ let R = null;          // loaded reference
 let PROD = null;       // NCBI product report for the gene
 let IDX = null;        // k-mer index of the reference
 const READS = []; let readSeq = 0;
-let AMPS = [];         // located amplicons
 let VARS = [];         // merged variants
 const ANN = new Map(); // annotation per variant key
 const UCLS = new Map();// user class & note per key
@@ -471,9 +481,7 @@ async function loadTranscript(i) {
   IDX = buildIndex(seq);
   renderGene();
   setGeneState(`${esc(symbol)} ready`);
-  const saved = recall(`ssv-primers-${symbol}`);
-  $('#primerText').value = saved || '';
-  locatePrimers(false);
+  loadScope();
   ANN.clear();
   READS.forEach(processRead);
   refresh();
@@ -1061,72 +1069,6 @@ function coverageArrays() {
 }
 
 /* =====================================================================
-   6. Primers
-   ===================================================================== */
-function parsePrimers(txt) {
-  const items = [];
-  for (const line of txt.split(/\r?\n/)) {
-    const t = line.trim(); if (!t || t.startsWith('#')) continue;
-    const toks = t.split(/[\s,;:\t]+/).filter(Boolean);
-    const seqs = toks.filter(x => /^[ACGTRYSWKMBDHVNacgtryswkmbdhvn]{12,}$/.test(x));
-    const name = toks.filter(x => !seqs.includes(x)).join(' ') || `primer${items.length + 1}`;
-    if (seqs.length >= 2) { items.push({name: name + '-F', seq: seqs[0].toUpperCase(), base: name, dir: 'F'}, {name: name + '-R', seq: seqs[1].toUpperCase(), base: name, dir: 'R'}); continue; }
-    if (!seqs.length) continue;
-    const m = name.match(/^(.*?)[-_. ]?(F|FW|FWD|FOR|FORWARD|R|RV|REV|REVERSE)$/i);
-    items.push({name, seq: seqs[0].toUpperCase(), base: m ? m[1] : name, dir: m ? (m[2][0].toUpperCase() === 'F' ? 'F' : 'R') : '?'});
-  }
-  const pairs = new Map(), loose = [];
-  for (const p of items) { if (p.dir === '?') { loose.push(p); continue; } const k = p.base.toUpperCase(); if (!pairs.has(k)) pairs.set(k, {name: p.base}); pairs.get(k)[p.dir] = p; }
-  for (let i = 0; i + 1 < loose.length; i += 2) pairs.set('_' + i, {name: loose[i].name + '/' + loose[i + 1].name, F: loose[i], R: loose[i + 1]});
-  return [...pairs.values()];
-}
-function findPrimer(seq) {
-  const hits = [];
-  const scan = (p, strand) => {
-    let i = R.seq.indexOf(p); while (i >= 0) { hits.push({s: i, e: i + p.length - 1, strand, mm: 0}); i = R.seq.indexOf(p, i + 1); }
-  };
-  const p = seq.replace(/[^A-Z]/g, ''); scan(p, '+'); scan(revcomp(p), '-');
-  if (hits.length) return hits;
-  for (const [q, strand] of [[p, '+'], [revcomp(p), '-']]) {
-    const n = q.length;
-    for (let i = 0; i + n <= R.seq.length; i++) { let mm = 0; for (let k = 0; k < n && mm <= 2; k++) if (R.seq[i + k] !== q[k] && !(IUPAC[q[k]] || '').includes(R.seq[i + k])) mm++; if (mm <= 2) hits.push({s: i, e: i + n - 1, strand, mm}); }
-  }
-  return hits;
-}
-function locatePrimers(save = true) {
-  if (!R) { if (save) toast('Load a gene first'); return; }
-  const txt = $('#primerText').value;
-  if (save) store(`ssv-primers-${R.symbol}`, txt);
-  AMPS = [];
-  for (const pr of parsePrimers(txt)) {
-    const a = {name: pr.name, notes: [], ok: false};
-    if (!pr.F || !pr.R) { a.notes.push('missing ' + (!pr.F ? 'forward' : 'reverse') + ' primer'); AMPS.push(a); continue; }
-    const hf = findPrimer(pr.F.seq), hr = findPrimer(pr.R.seq);
-    if (!hf.length || !hr.length) { a.notes.push(`${!hf.length ? 'F' : 'R'} primer not found in ${R.symbol} (±2 mismatches)`); AMPS.push(a); continue; }
-    let best = null;
-    for (const x of hf) for (const y of hr) { if (x.strand === y.strand) continue; const s = Math.min(x.s, y.s), e = Math.max(x.e, y.e), size = e - s + 1; if (size > 5000) continue; if (!best || size < best.size) best = {x, y, s, e, size}; }
-    if (!best) { a.notes.push('primers do not form an amplicon < 5 kb'); AMPS.push(a); continue; }
-    const five = best.x.s < best.y.s ? best.x : best.y, three = five === best.x ? best.y : best.x;
-    Object.assign(a, {ok: true, s: best.s, e: best.e, size: best.size, ins: [five.e + 1, three.s - 1], fFive: five === best.x});
-    if (hf.length > 1 || hr.length > 1) a.notes.push('primer matches several sites');
-    if (best.x.mm || best.y.mm) a.notes.push(`${best.x.mm + best.y.mm} mismatch(es) vs reference`);
-    a.notes.push(a.fFive ? 'F read → gene direction' : 'F read ← opposite to gene (minus-oriented)');
-    const ex = R.exons.filter(e => e.e >= a.ins[0] && e.s <= a.ins[1]).map(e => e.n);
-    a.exons = ex.length ? (ex.length > 1 ? `${ex[0]}–${ex[ex.length - 1]}` : String(ex[0])) : 'intronic';
-    AMPS.push(a);
-  }
-  renderPrimers(); refresh();
-}
-function renderPrimers() {
-  const ok = AMPS.filter(a => a.ok);
-  $('#primerState').textContent = AMPS.length ? `${ok.length}/${AMPS.length} located` : '';
-  $('#primerTable').innerHTML = AMPS.length ? AMPS.map(a => a.ok ?
-    `<tr><td><b>${esc(a.name)}</b></td><td class="mono">${a.size} bp</td><td class="mono">${cRange(a.ins[0], a.ins[1])}</td><td>${esc(a.exons)}</td><td class="small muted">${esc(a.notes.join(' · '))}</td></tr>` :
-    `<tr><td><b>${esc(a.name)}</b></td><td colspan="4"><span class="fl r">${esc(a.notes.join(' · '))}</span></td></tr>`).join('') :
-    `<tr><td colspan="5" class="muted small">No primers entered.</td></tr>`;
-}
-
-/* =====================================================================
    7. Annotation — batched & parallel:
       local genomic normalisation → [VariantValidator ∥ ClinVar ∥ gnomAD ∥ MobiDetails]
       Results cached in this browser for ANN_TTL.
@@ -1412,17 +1354,6 @@ function refresh() { if (rafP) return; rafP = true; requestAnimationFrame(() => 
 let rafV = false;
 function refreshVars() { if (rafV) return; rafV = true; requestAnimationFrame(() => { rafV = false; renderVariants(); renderSummary(); }); }
 
-function ampOf(r) {
-  const x = r.res; if (!x || x.status !== 'ok') return null; let best = null, bo = 0;
-  for (const a of AMPS) if (a.ok) { const o = Math.min(x.re, a.e) - Math.max(x.rs, a.s); if (o > bo) { bo = o; best = a; } }
-  return best;
-}
-function nameHint(r) {
-  const okA = AMPS.filter(a => a.ok); if (!okA.length) return null;
-  const nm = ' ' + r.name.toUpperCase().replace(/\.[A-Z0-9]+$/, '').replace(/[^A-Z0-9]+/g, ' ') + ' ';
-  const hits = okA.filter(a => { const b = a.name.toUpperCase().replace(new RegExp('^' + R.symbol + '[^A-Z0-9]*'), '').replace(/[^A-Z0-9]+/g, ''); return b && new RegExp(`[^A-Z0-9]${b}(F|R|FW|REV|FWD)?[^A-Z0-9]`).test(nm.replace(/(\d)\s+(F|R)\s/g, '$1$2 ')); });
-  return hits.length === 1 ? hits[0] : null;
-}
 function renderReads() {
   const el = $('#readsList');
   $('#readCount').textContent = READS.length ? `${READS.length} read${READS.length > 1 ? 's' : ''}` : '';
@@ -1436,7 +1367,6 @@ function renderReads() {
       dir = x.rev ? 'R ←' : 'F →'; cls = x.rev ? 'dirR' : 'dirF';
       if (r.ab && ST.trim) meta.push(`trim ${x.ts + 1}–${x.te + 1}`);
       meta.push(`<span class="mono">${cRange(x.rs, x.re)}</span>`, `${(x.ident * 100).toFixed(1)}% id`);
-      const a = ampOf(r); if (a) meta.push(`amplicon <b>${esc(a.name)}</b>`);
       const nv = x.events.length; meta.push(`${nv} diff${nv === 1 ? '' : 's'}`);
     } else { dir = '✗'; meta.push(`<span class="fl r">${x.status === 'short' ? 'too short after trimming' : x.status === 'nomatch' ? 'does not match ' + esc(R.symbol) : x.re - x.rs + 1 < 30 ? `only ${Math.max(0, x.re - x.rs + 1)} bp match ${esc(R.symbol)}` : 'low identity — check gene/sample'}</span>`); }
     return `<div class="rd ${r.on ? '' : 'off'}"><span class="dir ${cls}">${dir}</span><div><div class="nm">${esc(r.name)}</div><div class="meta">${meta.join(' · ')}</div></div>
@@ -1471,19 +1401,59 @@ function xOf(i) { const S = LAYOUT; let lo = 0, hi = S.length - 1; while (lo < h
 function idxOfX(x) { const S = LAYOUT; const s = S.find(z => x >= z.x && x <= z.x + z.w) || S[S.length - 1]; return Math.round(s.s + (x - s.x) / s.w * (s.e - s.s)); }
 function lanes(items) { const ends = []; return items.map(it => { let l = ends.findIndex(e => e < it.s - 2); if (l < 0) { l = ends.length; ends.push(0); } ends[l] = it.e; return l; }); }
 const CLS_COLOR = {P: 'var(--red)', LP: 'var(--orange)', VUS: 'var(--yellow)', LB: 'var(--green)', B: 'var(--green)'};
+/* ---------- coverage target (what you set out to sequence) ---------- */
+let SCOPE = {mode: 'auto', exons: '', pos: ''};
+function loadScope() {
+  SCOPE = Object.assign({mode: 'auto', exons: '', pos: ''}, recall(`ssv-scope-${R.symbol}`) || {});
+  $('#covScope').value = SCOPE.mode; $('#covExons').value = SCOPE.exons; $('#covPos').value = SCOPE.pos;
+  $('#covExons').style.display = SCOPE.mode === 'exons' ? '' : 'none';
+}
+const saveScope = () => { if (R) store(`ssv-scope-${R.symbol}`, SCOPE); };
+function parseExonList(t) { const out = new Set(); for (const part of String(t).split(/[\s,;]+/)) { const m = part.match(/^(?:ex(?:on)?)?(\d+)(?:[-–](\d+))?$/i); if (m) for (let k = +m[1]; k <= +(m[2] || m[1]) && k - m[1] < 500; k++) out.add(k); } return out; }
+function exonRanges(nums) { const a = [...nums].sort((x, y) => x - y), out = []; for (let k = 0; k < a.length; k++) { let j = k; while (j + 1 < a.length && a[j + 1] === a[j] + 1) j++; out.push(j > k ? `${a[k]}–${a[j]}` : String(a[k])); k = j; } return out.join(', '); }
+const codingExons = () => R.exons.filter(e => { for (let i = e.s; i <= e.e; i++) if (isCoding(i)) return true; return false; });
+function coverageTarget(cov) {
+  const cex = codingExons(); let set;
+  if (SCOPE.mode === 'cds') set = new Set(cex.map(e => e.n));
+  else if (SCOPE.mode === 'exons') { const want = parseExonList(SCOPE.exons); set = new Set(cex.filter(e => want.has(e.n)).map(e => e.n)); }
+  else { set = new Set(); for (const e of cex) for (let i = e.s; i <= e.e; i++) if (isCoding(i) && (cov.f[i] || cov.rv[i])) { set.add(e.n); break; } }
+  const mask = new Uint8Array(R.seq.length); for (const e of R.exons) if (set.has(e.n)) for (let i = e.s; i <= e.e; i++) if (isCoding(i)) mask[i] = 1;
+  const label = SCOPE.mode === 'cds' || (set.size === cex.length && set.size) ? 'whole CDS' : set.size ? `exon${set.size > 1 ? 's' : ''} ${exonRanges(set)}` : 'none yet';
+  return {set, mask, label};
+}
+function keyPositions(cov) {
+  const out = [];
+  for (const tok of String(SCOPE.pos).split(/[,;\s]+/).filter(Boolean)) {
+    const m = tok.replace(/^(NM_[\d.]+:)?c\./i, '').match(/^([-*]?\d+(?:[+-]\d+)?)(?:_([-*]?\d+(?:[+-]\d+)?))?(.*)$/);
+    const s = m ? cToIndex(m[1]) : null, e = m && m[2] ? cToIndex(m[2]) : s;
+    if (s == null || e == null || e < s || s < 0 || e >= R.seq.length) { out.push({tok, bad: true}); continue; }
+    let f = Infinity, rv = Infinity; for (let i = s; i <= e; i++) { f = Math.min(f, cov.f[i]); rv = Math.min(rv, cov.rv[i]); }
+    const vs = VARS.filter(v => v.s <= e && v.e >= s && (UCLS.get(v.key) || {}).cls !== 'ART');
+    const want = /[>]|del|dup|ins/i.test(m[3]) ? 'c.' + tok.replace(/^(NM_[\d.]+:)?c\./i, '') : '';
+    const bases = s === e ? goodReads().filter(r => readCovers(r, s)).map(r => `${r.name}${r.res.rev ? '←' : '→'} ${baseAt(r, s)}`) : [];
+    out.push({tok, s, e, f, rv, vs, want, bases});
+  }
+  return out;
+}
+function keyPosText(k) {
+  if (k.bad) return `${k.tok}: not a valid c. position`;
+  const cv = k.f && k.rv ? 'covered F+R' : k.f || k.rv ? 'covered one direction' : 'NOT covered';
+  const gt = k.vs.length ? k.vs.map(v => `${v.hgvs} ${v.zyg === 'het' ? 'het' : v.zyg === 'hom' ? 'hom' : '?'}`).join(', ') : k.f || k.rv ? 'reference (no variant called)' : '';
+  return `${cRange(k.s, k.e)}: ${cv}${gt ? ' · ' + gt : ''}${k.want ? (k.vs.some(v => v.hgvs.toLowerCase() === k.want.toLowerCase()) ? ` · ${k.want} found` : ` · ${k.want} not found`) : ''}`;
+}
 function renderCoverage() {
   const svg = $('#covSvg');
-  if (!R) { svg.setAttribute('viewBox', '0 0 1200 40'); svg.innerHTML = `<text x="16" y="24">Load a gene to see the coverage map.</text>`; $('#covStats').innerHTML = ''; $('#exonChips').innerHTML = ''; $('#covGaps').innerHTML = ''; return; }
+  if (!R) { svg.setAttribute('viewBox', '0 0 1200 40'); svg.innerHTML = `<text x="16" y="24">Load a gene to see the coverage map.</text>`; $('#covStats').innerHTML = ''; $('#exonChips').innerHTML = ''; $('#covGaps').innerHTML = ''; $('#covTargets').innerHTML = ''; return; }
   const W = 1200, PADX = 10, IW = W - 2 * PADX; LAYOUT = buildLayout(IW); const X = i => PADX + xOf(i);
   const cov = coverageArrays(), reads = goodReads();
-  const okA = AMPS.filter(a => a.ok);
+  const tg = coverageTarget(cov);
   let y = 0, h = '';
-  // exon labels + gene model
+  // exon labels + gene model (exons outside the target are faded)
   const gy = 30;
   h += `<line x1="${PADX}" x2="${W - PADX}" y1="${gy + 10}" y2="${gy + 10}" stroke="var(--muted)" stroke-width="1"/>`;
   for (const s of LAYOUT) {
     const x = PADX + s.x;
-    if (s.kind === 'cds') h += `<rect x="${x}" y="${gy}" width="${Math.max(1, s.w)}" height="20" rx="2" fill="var(--accent)"><title>Exon ${s.ex} coding: ${cRange(s.s, s.e)}</title></rect>`;
+    if (s.kind === 'cds') h += `<rect x="${x}" y="${gy}" width="${Math.max(1, s.w)}" height="20" rx="2" fill="var(--accent)" opacity="${tg.set.has(s.ex) ? 1 : .3}"><title>Exon ${s.ex} coding: ${cRange(s.s, s.e)}${tg.set.has(s.ex) ? '' : ' (outside target)'}</title></rect>`;
     else if (s.kind === 'utr') h += `<rect x="${x}" y="${gy + 5}" width="${Math.max(1, s.w)}" height="10" rx="2" fill="var(--muted)" opacity=".55"><title>Exon ${s.ex} UTR: ${cRange(s.s, s.e)} (${s.e - s.s + 1} bp)</title></rect>`;
     else if (s.comp) h += `<text x="${x + s.w / 2}" y="${gy + 14}" text-anchor="middle" style="font-size:9px">//</text><title>${s.kind} ${s.e - s.s + 1} bp</title>`;
   }
@@ -1491,20 +1461,16 @@ function renderCoverage() {
   // variant markers
   for (const v of VARS) { const u = UCLS.get(v.key) || {}; if (u.cls === 'ART') continue; const x = X(v.s); h += `<path d="M${x - 5} ${gy - 22} L${x + 5} ${gy - 22} L${x} ${gy - 14} Z" fill="${CLS_COLOR[u.cls] || 'var(--ink)'}"><title>${esc(v.hgvs)} ${esc(v.p || '')} (${v.zyg})</title></path>`; }
   y = gy + 30;
-  // depth strip
+  // depth strip: uncovered coding bases are red only inside the target
   h += `<text x="${PADX}" y="${y + 8}">depth</text>`; y += 12;
   let runS = 0, runK = -2;
-  const kindAt = i => { const t = (cov.f[i] > 0) + (cov.rv[i] > 0) * 2; if (t === 3) return 2; if (t) return 1; return isCoding(i) ? 0 : -1; };
+  const kindAt = i => { const t = (cov.f[i] > 0) + (cov.rv[i] > 0) * 2; if (t === 3) return 2; if (t) return 1; return tg.mask[i] ? 0 : -1; };
   const col = {0: 'var(--red)', 1: 'var(--orange)', 2: 'var(--green)'};
-  for (let i = 0; i <= R.seq.length; i++) { const k = i < R.seq.length ? kindAt(i) : -3; if (k !== runK) { if (runK >= 0) { const x1 = X(runS), x2 = X(i); h += `<rect x="${x1}" y="${y}" width="${Math.max(1, x2 - x1)}" height="8" fill="${col[runK]}"><title>${runK === 0 ? 'Coding, not covered' : runK === 1 ? 'One direction only' : 'Forward + reverse'}: ${cRange(runS, i - 1)}</title></rect>`; } runS = i; runK = k; } }
+  for (let i = 0; i <= R.seq.length; i++) { const k = i < R.seq.length ? kindAt(i) : -3; if (k !== runK) { if (runK >= 0) { const x1 = X(runS), x2 = X(i); h += `<rect x="${x1}" y="${y}" width="${Math.max(1, x2 - x1)}" height="8" fill="${col[runK]}"><title>${runK === 0 ? 'Target, not covered' : runK === 1 ? 'One direction only' : 'Forward + reverse'}: ${cRange(runS, i - 1)}</title></rect>`; } runS = i; runK = k; } }
   y += 16;
-  // amplicons
-  if (okA.length) {
-    h += `<text x="${PADX}" y="${y + 9}">primers / amplicons</text>`; y += 13;
-    const L = lanes(okA.slice().sort((a, b) => a.s - b.s).map(a => ({s: a.s, e: a.e}))), sorted = okA.slice().sort((a, b) => a.s - b.s);
-    sorted.forEach((a, k) => { const yy = y + L[k] * 16, x1 = X(a.s), x2 = X(a.e + 1); h += `<g><rect x="${x1}" y="${yy}" width="${Math.max(2, x2 - x1)}" height="11" rx="3" fill="var(--orange)" opacity=".28"/><rect x="${x1}" y="${yy}" width="${Math.max(1.5, X(a.ins[0]) - x1)}" height="11" fill="var(--orange)"/><rect x="${X(a.ins[1] + 1)}" y="${yy}" width="${Math.max(1.5, x2 - X(a.ins[1] + 1))}" height="11" fill="var(--orange)"/><text x="${x1 + 3}" y="${yy + 9}" style="fill:var(--ink);font-weight:700">${esc(a.name)}</text><title>${esc(a.name)} · ${a.size} bp · insert ${cRange(a.ins[0], a.ins[1])}</title></g>`; });
-    y += (Math.max(...L) + 1) * 16 + 4;
-  }
+  // key positions
+  const kp = keyPositions(cov).filter(k => !k.bad);
+  for (const k of kp) { const x = X(k.s), c = k.f && k.rv ? 'var(--green)' : k.f || k.rv ? 'var(--orange)' : 'var(--red)'; h += `<path d="M${x} ${gy - 2} L${x} ${y - 4}" stroke="${c}" stroke-width="2" stroke-dasharray="3 2"><title>${esc(keyPosText(k))}</title></path>`; }
   // reads
   if (reads.length) {
     h += `<text x="${PADX}" y="${y + 9}">reads (→ forward, ← reverse)</text>`; y += 13;
@@ -1518,26 +1484,33 @@ function renderCoverage() {
   }
   y += 6;
   svg.setAttribute('viewBox', `0 0 ${W} ${y}`); svg.style.height = 'auto'; svg.innerHTML = h;
-  // stats
-  const C = R.coding, n = C.length; let c1 = 0, c2 = 0, ca = 0;
-  const ampMask = new Uint8Array(R.seq.length); for (const a of okA) for (let i = a.ins[0]; i <= a.ins[1]; i++) ampMask[i] = 1;
-  for (let k = 0; k < n; k++) { const i = C[k]; if (cov.f[i] || cov.rv[i]) c1++; if (cov.f[i] && cov.rv[i]) c2++; if (ampMask[i]) ca++; }
-  const pc = v => (v / n * 100).toFixed(v === n ? 0 : 1) + '%';
-  R.covStat = {n, c1, c2, ca};
-  $('#covStats').innerHTML = `<div class="stat"><div class="v">${pc(c1)}</div><div class="l">CDS covered ≥1 read</div></div><div class="stat"><div class="v">${pc(c2)}</div><div class="l">CDS forward + reverse</div></div>` +
-    (okA.length ? `<div class="stat"><div class="v">${pc(ca)}</div><div class="l">CDS inside primer design</div></div>` : '') +
-    `<div class="stat"><div class="v">${n - c1}</div><div class="l">coding bp missing</div></div>`;
+  // stats — measured over the target, whole CDS shown for reference
+  const C = R.coding; let n = 0, c1 = 0, c2 = 0, w1 = 0;
+  for (let k = 0; k < C.length; k++) { const i = C[k], any = cov.f[i] || cov.rv[i]; if (any) w1++; if (!tg.mask[i]) continue; n++; if (any) c1++; if (cov.f[i] && cov.rv[i]) c2++; }
+  const pc = (v, d) => d ? (v / d * 100).toFixed(v === d ? 0 : 1) + '%' : '—';
+  R.covStat = {n, c1, c2, label: tg.label, whole: pc(w1, C.length), keys: keyPositions(cov).map(keyPosText)};
+  $('#covStats').innerHTML = `<div class="stat"><div class="v">${pc(c1, n)}</div><div class="l">target covered ≥1 read</div></div><div class="stat"><div class="v">${pc(c2, n)}</div><div class="l">target forward + reverse</div></div>` +
+    `<div class="stat"><div class="v">${n - c1}</div><div class="l">target bp missing</div></div>` +
+    `<div class="stat"><div class="v" style="font-size:15px;padding:3px 0">${esc(tg.label)}</div><div class="l">target · ${n} coding bp · whole CDS ${pc(w1, C.length)}</div></div>`;
   // exon chips
   $('#exonChips').innerHTML = R.exons.map(e => {
     let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; }
     if (!nc) return '';
-    const cl = k1 === nc ? 'full' : k1 ? 'part' : 'none';
-    return `<span class="ex ${cl}" data-idx="${e.s}" title="Exon ${e.n}: ${nc} coding bp · ${k1} covered · ${k2} both directions">Ex${e.n} ${Math.round(k1 / nc * 100)}%${k2 && k2 < nc ? ` <span style="opacity:.7">(F+R ${Math.round(k2 / nc * 100)}%)</span>` : k2 === nc ? ' F+R' : ''}</span>`;
+    const inT = tg.set.has(e.n), cl = !inT && !k1 ? 'off' : k1 === nc ? 'full' : k1 ? 'part' : 'none';
+    return `<span class="ex ${cl}" data-idx="${e.s}" title="Exon ${e.n}${inT ? '' : ' (outside target)'}: ${nc} coding bp · ${k1} covered · ${k2} both directions">Ex${e.n} ${Math.round(k1 / nc * 100)}%${k2 && k2 < nc ? ` <span style="opacity:.7">(F+R ${Math.round(k2 / nc * 100)}%)</span>` : k2 === nc ? ' F+R' : ''}</span>`;
   }).join('');
-  // gaps
-  const gaps = []; let gs = -1;
-  for (let k = 0; k <= n; k++) { const un = k < n && !(cov.f[C[k]] || cov.rv[C[k]]); if (un && gs < 0) gs = k; if (!un && gs >= 0) { gaps.push([C[gs], C[k - 1], k - gs]); gs = -1; } }
-  $('#covGaps').innerHTML = !reads.length ? '<span class="muted">Add reads to measure coverage.</span>' : gaps.length ? `<b>Coding gaps:</b> ${gaps.slice(0, 14).map(([a, b, l]) => `<span class="mono">${cRange(a, b)}</span> <span class="muted">(${l} bp)</span>`).join(' · ')}${gaps.length > 14 ? ` · +${gaps.length - 14} more` : ''}` : '<b style="color:var(--green)">Entire CDS covered.</b>';
+  // gaps inside the target only
+  const gaps = []; let gs = -1, gl = 0;
+  for (let k = 0; k <= C.length; k++) { const i = C[k]; if (k < C.length && !tg.mask[i]) { if (gs >= 0) { gaps.push([C[gs], C[k - 1], gl]); gs = -1; } continue; } const un = k < C.length && !(cov.f[i] || cov.rv[i]); if (un) { if (gs < 0) { gs = k; gl = 0; } gl++; } if (!un && gs >= 0) { gaps.push([C[gs], C[k - 1], gl]); gs = -1; } }
+  $('#covGaps').innerHTML = !reads.length && SCOPE.mode === 'auto' ? '<span class="muted">Add reads to measure coverage. Target = coding exons your reads touch; switch to “Whole CDS” or “Chosen exons” for a fixed target.</span>' : !n ? '<span class="muted">No coding exon in the target.</span>' : gaps.length ? `<b>Gaps in target:</b> ${gaps.slice(0, 14).map(([a, b, l]) => `<span class="mono">${cRange(a, b)}</span> <span class="muted">(${l} bp)</span>`).join(' · ')}${gaps.length > 14 ? ` · +${gaps.length - 14} more` : ''}` : `<b style="color:var(--green)">Entire target covered (${esc(tg.label)}).</b>`;
+  // key positions list
+  $('#covTargets').innerHTML = keyPositions(cov).map(k => {
+    if (k.bad) return `<div class="t"><span class="fl r">${esc(k.tok)}: not a valid c. position</span></div>`;
+    const cv = k.f && k.rv ? '<span class="bdg ok">F+R</span>' : k.f || k.rv ? `<span class="bdg warn">${k.f ? 'F only' : 'R only'}</span>` : '<span class="bdg bad">not covered</span>';
+    const gt = k.vs.length ? k.vs.map(v => `<span class="hg">${esc(v.hgvs)}</span> ${v.zyg === 'het' ? 'Het' : v.zyg === 'hom' ? 'Hom' : '<span class="fl r">?</span>'}`).join(' · ') : k.f || k.rv ? '<span class="muted">reference — no variant called</span>' : '';
+    const exp = k.want ? (k.vs.some(v => v.hgvs.toLowerCase() === k.want.toLowerCase()) ? `<span class="bdg ok">${esc(k.want)} found</span>` : k.f || k.rv ? `<span class="bdg info">${esc(k.want)} not found</span>` : '') : '';
+    return `<div class="t" data-kp="${k.s}"><b class="mono">${esc(cRange(k.s, k.e))}</b>${cv}${exp}${gt}${k.bases.length ? `<span class="small muted mono">${esc(k.bases.join(' · '))}</span>` : ''}</div>`;
+  }).join('');
 }
 
 /* ---------- variants table ---------- */
@@ -1630,9 +1603,6 @@ function renderFlags() {
       else out.push(['', `${r.name}: mixed/overlapping trace from ${where} — no consistent indel shift found (noise, contamination or several variants). Inspect the trace; heterozygous SNV calls in this stretch are suppressed.`]);
     }
     if (sigs.has(x.sig)) out.push(['', `${r.name} looks identical to ${sigs.get(x.sig)} (duplicate file?).`]); else sigs.set(x.sig, r.name);
-    const hint = nameHint(r), amp = ampOf(r);
-    if (hint && amp && hint !== amp) out.push(['r', `${r.name}: the name suggests amplicon ${hint.name}, but the read aligns to ${amp.name}. Possible tube/label swap.`]);
-    if (AMPS.some(a => a.ok) && !amp) out.push(['', `${r.name}: aligns outside every primer amplicon.`]);
   }
   for (const v of VARS) if (v.other.length && v.zyg === 'het') out.push(['', `${v.hgvs}: heterozygous in ${v.sup.map(s => s.r.name).join(', ')} but plain reference in ${v.other.map(o => o.r.name + (o.alt != null ? ` (alt peak ${Math.round(o.alt * 100)}% of reference)` : '')).join(', ')} — check both traces.`]);
   $('#flags').innerHTML = out.map(([c, t]) => `<div class="fb ${c}">${esc(t)}</div>`).join('');
@@ -1664,7 +1634,6 @@ function renderAlignment() {
   if (ST.view === 'reads' && !reads.length) { box.innerHTML = '<div class="empty" style="margin:8px">No aligned reads yet — switch "Show" to coding exons or whole gene to browse the reference.</div>'; return; }
   const W = ST.width, regs = viewRegions(), seq = R.seq;
   const vpos = new Set(); for (const v of VARS) for (let i = v.s; i <= Math.max(v.s, v.e); i++) vpos.add(i);
-  const prim = new Uint8Array(seq.length); for (const a of AMPS) if (a.ok) { for (let i = a.s; i < a.ins[0]; i++) prim[i] = 1; for (let i = a.ins[1] + 1; i <= a.e; i++) prim[i] = 1; }
   if (ST.view === 'all' && seq.length > 250000) { box.innerHTML = '<div class="empty" style="margin:8px">Gene too large for whole-gene view; use read-covered regions or coding exons.</div>'; return; }
   const parts = []; let prevEnd = -1;
   for (const [a0, b0] of regs) {
@@ -1683,7 +1652,7 @@ function renderAlignment() {
       for (let i = s; i <= e; i++) {
         const rg = R.mpos[i] ? (isCoding(i) ? 'cds' : 'utr') : 'in';
         rc.push(rg === 'in' ? seq[i].toLowerCase() : seq[i]);
-        rk.push(['k-' + rg, prim[i] ? 'k-pr' : '', vpos.has(i) ? 'k-v' : '', i === CUR ? 'k-cur' : ''].filter(Boolean).join(' '));
+        rk.push(['k-' + rg, vpos.has(i) ? 'k-v' : '', i === CUR ? 'k-cur' : ''].filter(Boolean).join(' '));
       }
       h += `<div class="ln ref"><span class="lab">${esc(R.symbol)}</span><span class="sq" data-row="ref" data-s="${s}">${spansFrom(rc, rk)}</span></div>`;
       // reads
@@ -1796,7 +1765,7 @@ async function exportXlsx() {
     const wb = new ExcelJS.Workbook(); wb.creator = 'SangerScope'; wb.created = new Date();
     const ws = wb.addWorksheet('Variants', {views: [{state: 'frozen', ySplit: 8}]});
     const today = new Date().toISOString().slice(0, 10);
-    const cs = R.covStat || {n: R.coding.length, c1: 0, c2: 0};
+    renderCoverage(); const cs = R.covStat;
     const head = ['Patient', 'Gene', 'Transcript', 'HGVS c.', 'HGVS p.', 'Nomenclature check (VariantValidator)', 'Location', 'Zygosity', 'Variant type', 'Consequence', 'GRCh38 (g.)', 'dbSNP', 'ClinVar', 'ClinVar review', 'GeneBe', 'gnomAD v4 AF', 'REVEL', 'AlphaMissense', 'CADD phred', 'SpliceAI max Δ', 'MobiDetails', 'Supporting reads', 'Flags', 'Classification', 'Notes'];
     const LAST = String.fromCharCode(64 + head.length), CLS_COL = head.indexOf('Classification') + 1;
     const reads = goodReads();
@@ -1805,7 +1774,8 @@ async function exportXlsx() {
       ['Gene', `${R.symbol} — ${R.tx}${R.select === 'MANE_SELECT' ? ' (MANE Select)' : ''} · ${R.np}${R.ccds ? ' · ' + R.ccds : ''} · ${R.chrAcc} (GRCh38)`],
       ['Analysis date', today],
       ['Reads', reads.map(r => `${r.name}${r.res.rev ? '←' : '→'} ${cRange(r.res.rs, r.res.re)}`).join('; ') || 'none'],
-      ['CDS coverage', `${(cs.c1 / cs.n * 100).toFixed(1)}% ≥1 read · ${(cs.c2 / cs.n * 100).toFixed(1)}% forward + reverse (${cs.n} coding bp)`],
+      ['Coverage', cs.n ? `Target ${cs.label}: ${(cs.c1 / cs.n * 100).toFixed(1)}% ≥1 read · ${(cs.c2 / cs.n * 100).toFixed(1)}% forward + reverse (${cs.n} coding bp) · whole CDS ${cs.whole}` : `no target · whole CDS ${cs.whole || '0%'}`],
+      ['Key positions', (cs.keys || []).join('; ') || '—'],
     ];
     ws.mergeCells(`A1:${LAST}1`); ws.getCell('A1').value = `Sanger sequencing results — ${R.symbol} — ${patient}`;
     ws.getCell('A1').font = {bold: true, size: 14, color: {argb: 'FFFFFFFF'}}; ws.getCell('A1').fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FF1F3864'}}; ws.getRow(1).height = 24;
@@ -1837,13 +1807,12 @@ async function exportXlsx() {
     ws.autoFilter = {from: 'A8', to: `${LAST}${Math.max(9, rn - 1)}`};
     // coverage sheet
     const w2 = wb.addWorksheet('Reads & coverage');
-    w2.addRow(['Read', 'Source', 'Orientation', 'Aligned region', 'Length aligned', 'Identity', 'Amplicon', 'Mixed-trace regions']).font = {bold: true};
-    for (const r of READS) { const x = r.res; if (!x) continue; w2.addRow([r.name, r.ab ? 'AB1' : 'text', x.status === 'ok' ? (x.rev ? 'reverse' : 'forward') : x.status, x.status === 'ok' ? cRange(x.rs, x.re) : '', x.status === 'ok' ? x.re - x.rs + 1 : '', x.status === 'ok' ? (x.ident * 100).toFixed(1) + '%' : '', ampOf(r)?.name || '', (x.mixInfo || []).map(m => `${m.approx ? '~' : ''}c.${cLabel(m.start)}${m.call?.hgvs ? ` (het ${m.call.hgvs})` : m.shift ? ` (het indel, shift ${Math.abs(m.shift)} bp)` : ' (mixed)'}`).join('; ')]); }
-    w2.addRow([]); w2.addRow(['Exon', 'Coding bp', 'Covered', 'Forward + reverse']).font = {bold: true};
-    const cov = coverageArrays();
-    for (const e of R.exons) { let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; } if (nc) w2.addRow([e.n, nc, `${k1} (${Math.round(k1 / nc * 100)}%)`, `${k2} (${Math.round(k2 / nc * 100)}%)`]); }
-    if (AMPS.length) { w2.addRow([]); w2.addRow(['Amplicon', 'Size', 'Sequenced insert', 'Exons', 'Notes']).font = {bold: true}; for (const a of AMPS) w2.addRow(a.ok ? [a.name, a.size, cRange(a.ins[0], a.ins[1]), a.exons, a.notes.join('; ')] : [a.name, '', '', '', a.notes.join('; ')]); }
-    [16, 10, 14, 34, 14, 10, 14, 40].forEach((w, k) => w2.getColumn(k + 1).width = w);
+    w2.addRow(['Read', 'Source', 'Orientation', 'Aligned region', 'Length aligned', 'Identity', 'Mixed-trace regions']).font = {bold: true};
+    for (const r of READS) { const x = r.res; if (!x) continue; w2.addRow([r.name, r.ab ? 'AB1' : 'text', x.status === 'ok' ? (x.rev ? 'reverse' : 'forward') : x.status, x.status === 'ok' ? cRange(x.rs, x.re) : '', x.status === 'ok' ? x.re - x.rs + 1 : '', x.status === 'ok' ? (x.ident * 100).toFixed(1) + '%' : '', (x.mixInfo || []).map(m => `${m.approx ? '~' : ''}c.${cLabel(m.start)}${m.call?.hgvs ? ` (het ${m.call.hgvs})` : m.shift ? ` (het indel, shift ${Math.abs(m.shift)} bp)` : ' (mixed)'}`).join('; ')]); }
+    w2.addRow([]); w2.addRow(['Exon', 'Coding bp', 'Covered', 'Forward + reverse', 'In target']).font = {bold: true};
+    const cov = coverageArrays(), tg = coverageTarget(cov);
+    for (const e of R.exons) { let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; } if (nc) w2.addRow([e.n, nc, `${k1} (${Math.round(k1 / nc * 100)}%)`, `${k2} (${Math.round(k2 / nc * 100)}%)`, tg.set.has(e.n) ? 'yes' : 'no']); }
+    [16, 10, 14, 34, 14, 10, 40].forEach((w, k) => w2.getColumn(k + 1).width = w);
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -1903,7 +1872,6 @@ function bind() {
     else if (act === 'copy') { const x = r.res; if (x?.q) copyText(x.q, 'Read copied (trimmed, gene orientation)'); else copyText(r.ab ? r.ab.base : r.seq); }
     else if (act === 'fa') copyText(`>${r.name}\n${r.ab ? r.ab.base : r.seq}\n`, 'FASTA copied');
   };
-  $('#primerBtn').onclick = () => locatePrimers(true);
   $('#exportBtn').onclick = exportXlsx;
   $('#clearBtn').onclick = () => { if (READS.length && !confirm('Remove all reads, variants and classifications for this patient?')) return; READS.length = 0; UCLS.clear(); SEL = null; CUR = -1; $('#patient').value = ''; $('#sample').value = ''; $('#tracePanel').classList.remove('on'); refresh(); };
   // variant table
@@ -1925,6 +1893,15 @@ function bind() {
     const svg = $('#covSvg'), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const p = pt.matrixTransform(svg.getScreenCTM().inverse());
     scrollToIdx(idxOfX(Math.max(0, p.x - 10)));
   });
+  $('#covScope').onchange = e => { SCOPE.mode = e.target.value; $('#covExons').style.display = SCOPE.mode === 'exons' ? '' : 'none'; if (SCOPE.mode === 'exons' && !SCOPE.exons) $('#covExons').focus(); saveScope(); renderCoverage(); };
+  $('#covExons').addEventListener('input', e => { SCOPE.exons = e.target.value; saveScope(); if (R) renderCoverage(); });
+  $('#covPos').addEventListener('change', e => { SCOPE.pos = e.target.value; saveScope(); if (R) renderCoverage(); });
+  $('#covTargets').onclick = e => { const t = e.target.closest('[data-kp]'); if (!t) return; const i = +t.dataset.kp; scrollToIdx(i); if (goodReads().some(x => x.ab && readCovers(x, i))) showTraces(i); };
+  // theme
+  const THEMES = ['auto', 'light', 'dark'];
+  const applyTheme = t => { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('#themeBtn').textContent = 'Theme: ' + t; if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); };
+  applyTheme(THEMES.includes(recall('ssv-theme')) ? recall('ssv-theme') : 'auto');
+  $('#themeBtn').onclick = () => { const t = THEMES[(THEMES.indexOf(recall('ssv-theme') || 'auto') + 1) % 3]; store('ssv-theme', t); applyTheme(t); };
   $('#exonChips').onclick = e => { const c = e.target.closest('[data-idx]'); if (c) { let i = +c.dataset.idx; while (!isCoding(i) && i < R.seq.length - 1 && R.mpos[i]) i++; scrollToIdx(i, false); } };
   // alignment
   $('#viewMode').value = ST.view; $('#blockW').value = String(ST.width); $('#dotsChk').checked = ST.dots;
@@ -1956,7 +1933,7 @@ function bind() {
   $('#sClearCache').onclick = () => { let n = 0; try { for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if (/^ssv-(ann\d|vv|prod)-/.test(key)) { localStorage.removeItem(key); n++; } } } catch (e) {} toast(`Cleared ${n} cached entries`); };
   window.addEventListener('beforeunload', e => { if (READS.length) { e.preventDefault(); e.returnValue = ''; } });
   window.addEventListener('resize', () => { if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); });
-  renderRef(); renderCoverage(); renderPrimers();
+  renderRef(); renderCoverage();
 }
 bind();
 </script>
