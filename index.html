@@ -185,6 +185,14 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
 .pt td{font-size:12.5px}
 .hint{font-size:12px;color:var(--muted);margin-top:6px}
 .annot{font-size:12px}
+.tbl td.c-cv,.tbl td.c-gb{min-width:150px;max-width:230px}
+.tbl td.c-rv{min-width:150px}
+.tbl td.c-rv select.cls{width:100%;margin-top:5px}
+.tbl td.c-rv input.note{width:100%;margin-top:4px;box-sizing:border-box}
+.pr{font-family:var(--mono);font-size:12px;white-space:nowrap;margin-top:1px}
+.zr{margin-top:5px;font-size:12px}
+.sep{border-top:1px dashed var(--line);margin:6px 0 5px}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .annot a{font-weight:700}
 .vvn{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .sc{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;margin:2px 3px 0 0;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
@@ -272,7 +280,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
 
   <section class="card">
     <h2><span class="n">5</span>Variants<span class="rt" id="varState"></span></h2>
-    <div class="tbl"><table id="varTable"><thead><tr><th>HGVS c.</th><th>Protein</th><th>Location / effect</th><th>Zyg.</th><th>Reads</th><th>ClinVar</th><th>GeneBe</th><th>gnomAD v4</th><th>MobiDetails</th><th>Flags</th><th>Your class</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+    <div class="tbl"><table id="varTable"><thead><tr><th>Variant</th><th>Location · reads</th><th>ClinVar</th><th>GeneBe</th><th>gnomAD v4 · scores</th><th>Review</th></tr></thead><tbody></tbody></table></div>
     <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
     <div id="flags" class="flagsbox"></div>
   </section>
@@ -1227,7 +1235,8 @@ async function clinvarBatch(list) {
 const GB = 'https://api.genebe.net/cloud/api-public/v1/variants';
 const gbUrl = vcf => `https://genebe.net/variant/hg38/chr${vcf.chr}-${vcf.pos}-${vcf.ref}-${vcf.alt}`;
 const gbTxt = c => String(c || '').replace(/_/g, ' ').trim();
-const gbRec = (x, r) => ({url: gbUrl(x.loc.vcf), acmg: gbTxt(r.acmg_classification), score: r.acmg_score ?? null, crit: r.acmg_criteria || '', comb: gbTxt(r.pathogenicity_classification_combined), pheno: r.phenotype_combined || '', cv: gbTxt(r.clinvar_classification), cvDis: r.clinvar_disease || '', rs: r.dbsnp || ''});
+const gbPheno = p => [...new Set(String(p || '').split('|').map(t => t.trim()).filter(Boolean))].join('; ');
+const gbRec = (x, r) => ({url: gbUrl(x.loc.vcf), acmg: gbTxt(r.acmg_classification), score: r.acmg_score ?? null, crit: r.acmg_criteria || '', comb: gbTxt(r.pathogenicity_classification_combined), pheno: gbPheno(r.phenotype_combined), cv: gbTxt(r.clinvar_classification), cvDis: r.clinvar_disease || '', rs: r.dbsnp || ''});
 // GeneBe's API only accepts browser (CORS) requests from pages served on http(s)://localhost or genebe.net.
 // From any other origin — GitHub Pages, a file:// page (Origin: null), even http://127.0.0.1 — it answers
 // 403 "Invalid CORS request" and the browser reports a network error. Run SangerScope with serve.py.
@@ -1278,7 +1287,7 @@ function gbCell(a, run) {
   const link = `<a href="${esc(g.url)}" target="_blank" rel="noopener">GeneBe</a>`;
   if (g.failed && g.origin) return `${link}<div class="small muted" title="${esc(GB_ORIGIN_MSG())}">not loaded — GeneBe needs a relay when SangerScope runs online (Settings → GeneBe relay URL) ⓘ</div>`;
   if (g.failed) return `${link}<div class="small muted" title="${esc(g.why || '')}">not loaded (${esc(g.why || 'error')}) — open the page</div>`;
-  let h = g.comb ? cvClassChip(g.comb) + (g.pheno ? `<div class="vvn" style="font-family:var(--sans)" title="${esc(g.pheno)}">${esc(g.pheno.length > 60 ? g.pheno.slice(0, 60) + '…' : g.pheno)}</div>` : '') : '<span class="muted small">no submitted classification</span>';
+  let h = g.comb ? cvClassChip(g.comb) + (g.pheno ? `<div class="vvn clamp2" style="font-family:var(--sans)" title="${esc(gbPheno(g.pheno))}">${esc(gbPheno(g.pheno))}</div>` : '') : '<span class="muted small">no submitted classification</span>';
   if (g.acmg) h += `<div class="small" title="GeneBe automatic ACMG classification${g.crit ? ': ' + esc(g.crit) : ''}">ACMG auto: <b>${esc(g.acmg)}</b>${g.score != null ? ` (${g.score} pts)` : ''}</div>${g.crit ? `<div class="vvn">${esc(g.crit.replace(/,/g, ', '))}</div>` : ''}`;
   if (g.cv && (!a.cv?.exact)) h += `<div class="small" style="color:var(--orange)" title="${esc(g.cvDis)}">ClinVar (via GeneBe): ${esc(g.cv)}</div>`;
   return h + `<div class="small">${link}</div>`;
@@ -1547,7 +1556,7 @@ function annotCells(v) {
   if (!a) return [`<button class="btn sm ghost" data-ann="${esc(v.key)}">Annotate</button>`, '', '', ''];
   const run = a.st === 'run';
   let cv = '';
-  if (a.cv?.exact) { const x = a.cv.exact; cv = `${cvClassChip(x.cls)} <span title="${esc(x.review)}">${'★'.repeat(x.stars)}${'☆'.repeat(4 - x.stars)}</span><br><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/${x.uid}/" target="_blank" rel="noopener">${esc(x.acc || 'VCV')}</a>${x.rs ? ` · <a href="https://www.ncbi.nlm.nih.gov/snp/${x.rs}" target="_blank" rel="noopener">${x.rs}</a>` : ''}${x.traits.length ? `<div class="vvn" style="font-family:var(--sans)">${esc(x.traits.join('; '))}</div>` : ''}`; }
+  if (a.cv?.exact) { const x = a.cv.exact; cv = `${cvClassChip(x.cls)} <span title="${esc(x.review)}">${'★'.repeat(x.stars)}${'☆'.repeat(4 - x.stars)}</span><br><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/${x.uid}/" target="_blank" rel="noopener">${esc(x.acc || 'VCV')}</a>${x.rs ? ` · <a href="https://www.ncbi.nlm.nih.gov/snp/${x.rs}" target="_blank" rel="noopener">${x.rs}</a>` : ''}${x.traits.length ? `<div class="vvn clamp2" style="font-family:var(--sans)" title="${esc(x.traits.join('; '))}">${esc(x.traits.join('; '))}</div>` : ''}`; }
   else if (a.cv) cv = `<span class="muted">Not in ClinVar</span>${a.cv.near.length ? `<br><span class="small muted" title="${esc(a.cv.near.map(n => n.title + ' — ' + n.cls).join('\n'))}">${a.cv.near.length} other record${a.cv.near.length > 1 ? 's' : ''} at this position ⓘ</span>` : ''}`;
   else if (run) cv = '<span class="spin"></span>';
   else cv = '<span class="muted">—</span>';
@@ -1580,8 +1589,17 @@ function mdCell(a, run) {
   if (run) return '<span class="spin"></span>';
   return '<span class="muted">—</span>';
 }
+// Short read label for the table ("A12_YASSINE HBB 1F_20260108_114636" → "1F"); full name on hover.
+// Falls back to the full name when no F/R token is found or two reads would get the same label.
+function readLabels() {
+  const short = n => String(n).split(/[\s_.\-]+/).find(t => /^\d{0,3}[FR]\d{0,3}$/i.test(t)) || null;
+  const m = new Map(), seen = new Map();
+  for (const r of READS) { const l = short(r.name); if (l) seen.set(l.toUpperCase(), (seen.get(l.toUpperCase()) || 0) + 1); }
+  for (const r of READS) { const l = short(r.name); m.set(r, l && seen.get(l.toUpperCase()) === 1 ? l : r.name); }
+  return m;
+}
 function renderVariants() {
-  const tb = $('#varTable tbody');
+  const tb = $('#varTable tbody'), RL = readLabels();
   $('#varEmpty').style.display = VARS.length ? 'none' : 'block';
   const nAnn = VARS.filter(v => ANN.get(v.key)?.st === 'run').length;
   $('#varState').innerHTML = VARS.length ? `${VARS.length} variant${VARS.length > 1 ? 's' : ''}${nAnn ? ` · <span class="spin"></span> annotating ${nAnn}` : ''}` : '';
@@ -1595,18 +1613,19 @@ function renderVariants() {
     const gLoc = a?.g || genomicOf(v).g, gTxt = vv?.g || gLoc; if (gTxt) hg += `<div class="vvn">${esc(gTxt)}</div>`;
     if (vv?.g && gLoc && vv.g !== gLoc) hg += `<div class="vvn" style="color:var(--orange)" title="Local genomic normalisation differs from VariantValidator: ${esc(gLoc)}">local g. differs ⓘ</div>`;
     if (vv?.warn?.length) hg += `<div class="vvn" style="color:var(--orange)" title="${esc(vv.warn.join('\n'))}">VV warning ⓘ</div>`;
-    let prot = esc(vvP || v.p || '—');
+    let prot = `<div class="pr">${esc(vvP || v.p || '—')}</div>`;
     if (!vvP && v.p) prot += `<div class="vvn" title="Predicted locally from the transcript; VariantValidator has not confirmed it yet">local</div>`;
     else if (vvP && v.p && normP(vvP) !== normP(v.p)) prot += `<div class="vvn" style="color:var(--orange)" title="Local prediction differs from VariantValidator">local: ${esc(v.p)}</div>`;
     const zyg = v.zyg === 'het' ? 'Het' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Hom/Hemi' : 'Hom') : '<span class="fl r">?</span>';
-    const reads = v.sup.map(s => `<span title="${s.q != null ? 'Q' + s.q : ''}${s.ratio ? ` · secondary/primary ${(s.ratio * 100).toFixed(0)}%` : ''}">${esc(s.r.name)}${s.r.res.rev ? '←' : '→'}${s.ratio && s.zyg === 'het' ? ` <span class="muted">${Math.round(s.ratio * 100)}%</span>` : ''}</span>`).join('<br>');
+    const reads = v.sup.map(s => `<span title="${esc(s.r.name)}${s.q != null ? ' · Q' + s.q : ''}${s.ratio ? ` · secondary/primary ${(s.ratio * 100).toFixed(0)}%` : ''}">${esc(RL.get(s.r) || s.r.name)}${s.r.res.rev ? '←' : '→'}${s.ratio && s.zyg === 'het' ? ` <span class="muted">${Math.round(s.ratio * 100)}%</span>` : ''}</span>`).join('<br>');
     return `<tr class="vr ${SEL === v.key ? 'sel' : ''}" data-key="${esc(v.key)}">
-      <td>${hg}</td><td class="mono" style="white-space:nowrap">${prot}</td>
-      <td><div>${esc(v.loc)}</div><div class="small muted">${esc([v.type, v.effect].filter(Boolean).join(' · '))}</div></td>
-      <td>${zyg}</td><td class="small">${reads}</td><td class="annot">${cv}</td><td class="annot">${gb}</td><td class="annot">${gn}</td><td class="annot md">${md}</td>
-      <td><div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div></td>
-      <td><select class="cls" data-cls="${esc(v.key)}">${CLS_OPTS.map(([k, l]) => `<option value="${k}" ${u.cls === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
-      <td><input class="note" data-note="${esc(v.key)}" value="${esc(u.note)}" placeholder="note"></td></tr>`;
+      <td>${hg.replace('</div>', '</div>' + prot)}</td>
+      <td><div>${esc(v.loc)}</div><div class="small muted">${esc([v.type, v.effect].filter(Boolean).join(' · '))}</div><div class="zr"><b>${zyg}</b></div><div class="small">${reads}</div></td>
+      <td class="annot c-cv">${cv}</td><td class="annot c-gb">${gb}</td>
+      <td class="annot md">${gn}${gn && md ? '<div class="sep"></div>' : ''}${md}</td>
+      <td class="c-rv"><div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div>
+        <select class="cls" data-cls="${esc(v.key)}">${CLS_OPTS.map(([k, l]) => `<option value="${k}" ${u.cls === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <input class="note" data-note="${esc(v.key)}" value="${esc(u.note)}" placeholder="note"></td></tr>`;
   }).join('');
 }
 
