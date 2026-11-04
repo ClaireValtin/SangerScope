@@ -327,8 +327,10 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
     <input type="password" id="sKey" class="inp" style="width:180px" autocomplete="off">
     <div>MobiDetails API key (optional)<small>Free MobiDetails account → profile page. Needed only to create variants MobiDetails doesn't have yet. Stored only in this browser.</small></div>
     <input type="password" id="sMdKey" class="inp" style="width:180px" autocomplete="off">
-    <div>GeneBe account (optional)<small>Username (e-mail) and API key from your GeneBe profile. Raises the anonymous daily query limit. Stored only in this browser. GeneBe only answers pages opened at <span class="mono">http://localhost</span>: start SangerScope with <span class="mono">python3 serve.py</span>.</small></div>
+    <div>GeneBe account (optional)<small>Username (e-mail) and API key from your GeneBe profile. Raises the anonymous daily query limit. Stored only in this browser. GeneBe only answers pages opened at <span class="mono">http://localhost</span>; elsewhere it is reached through the relay below.</small></div>
     <div class="row"><input type="text" id="sGbUser" class="inp" style="width:140px" placeholder="username" autocomplete="off"><input type="password" id="sGbKey" class="inp" style="width:140px" placeholder="API key" autocomplete="off"></div>
+    <div>GeneBe relay URL<small>Needed when SangerScope is hosted online (e.g. GitHub Pages): your Cloudflare Worker from <span class="mono">relay/genebe-relay.js</span>. Leave empty to use the built-in one. Not used on localhost.</small></div>
+    <input type="text" id="sGbRelay" class="inp" style="width:280px" placeholder="https://….workers.dev" autocomplete="off">
     <div>Annotation cache<small>Results are reused for 7 days. Clear to force fresh ClinVar / gnomAD / MobiDetails data.</small></div>
     <button class="btn sm ghost" id="sClearCache" type="button">Clear cache</button>
   </div>
@@ -363,7 +365,7 @@ const tr1 = c => CODON[c] || 'X';
 function translate(s) { let p = ''; for (let i = 0; i + 2 < s.length; i += 3) p += tr1(s.slice(i, i + 3)); return p; }
 
 /* ---------------- settings & state ---------------- */
-const DEF = {het: 0.30, trim: true, trimQ: 20, edge: 10, auto: true, ncbiKey: '', mdKey: '', gbUser: '', gbKey: '', width: 100, dots: false, view: 'reads'};
+const DEF = {het: 0.30, trim: true, trimQ: 20, edge: 10, auto: true, ncbiKey: '', mdKey: '', gbUser: '', gbKey: '', gbRelay: '', width: 100, dots: false, view: 'reads'};
 const ST = Object.assign({}, DEF, recall('ssv-settings') || {});
 const saveSettings = () => store('ssv-settings', ST);
 
@@ -1229,8 +1231,14 @@ const gbRec = (x, r) => ({url: gbUrl(x.loc.vcf), acmg: gbTxt(r.acmg_classificati
 // GeneBe's API only accepts browser (CORS) requests from pages served on http(s)://localhost or genebe.net.
 // From any other origin — GitHub Pages, a file:// page (Origin: null), even http://127.0.0.1 — it answers
 // 403 "Invalid CORS request" and the browser reports a network error. Run SangerScope with serve.py.
-const gbOriginOk = () => location.hostname === 'localhost' || /(^|\.)genebe\.net$/.test(location.hostname);
-const GB_ORIGIN_MSG = () => `GeneBe only accepts requests from pages opened at http://localhost — this page runs from ${location.protocol === 'file:' ? 'a local file' : location.host}. Start SangerScope with serve.py (python3 serve.py) and use the address it opens.`;
+// Hosted elsewhere, requests go through our relay (relay/genebe-relay.js, a Cloudflare Worker) which forwards
+// them to GeneBe server-side and answers with CORS headers for SangerScope's address only.
+const GB_RELAY_DEFAULT = '';   // ← the deployed worker URL, e.g. https://sangerscope-genebe.<account>.workers.dev
+const gbDirectOk = () => location.hostname === 'localhost' || /(^|\.)genebe\.net$/.test(location.hostname);
+const gbRelay = () => gbDirectOk() ? '' : String(ST.gbRelay || GB_RELAY_DEFAULT).trim().replace(/\/+$/, '');
+const gbBase = () => gbRelay() ? gbRelay() + '/cloud/api-public/v1/variants' : GB;
+const gbOriginOk = () => gbDirectOk() || !!gbRelay();
+const GB_ORIGIN_MSG = () => `GeneBe only accepts requests from pages opened at http://localhost — this page runs from ${location.protocol === 'file:' ? 'a local file' : location.host}. Set a GeneBe relay URL in Settings (see relay/genebe-relay.js), or start SangerScope locally with python3 serve.py.`;
 // Batch POST first (JSON body → the browser sends a CORS preflight). If that is refused, fall back to the
 // single-variant GET endpoint: a plain GET without custom headers needs no preflight.
 async function genebeBatch(list) {
@@ -1240,7 +1248,7 @@ async function genebeBatch(list) {
     let postErr = null;
     try {
       const body = JSON.stringify(chunk.map(x => ({chr: x.loc.vcf.chr, pos: x.loc.vcf.pos, ref: x.loc.vcf.ref, alt: x.loc.vcf.alt})));
-      const d = await serial('gb', 1000, () => fetchRetry(`${GB}?genome=hg38&useEnsembl=false`, {method: 'POST', headers: {'content-type': 'application/json', ...auth}, body}, 'json', 1));
+      const d = await serial('gb', 1000, () => fetchRetry(`${gbBase()}?genome=hg38&useEnsembl=false`, {method: 'POST', headers: {'content-type': 'application/json', ...auth}, body}, 'json', 1));
       const vs = d.variants || [];
       chunk.forEach((x, n) => { x.a.gb = gbRec(x, vs[n] || {}); });
     } catch (err) { postErr = err; }
@@ -1252,7 +1260,7 @@ async function genebeBatch(list) {
       const v = x.loc.vcf;
       try {
         const q = `chr=${encodeURIComponent(v.chr)}&pos=${v.pos}&ref=${v.ref}&alt=${v.alt}&genome=hg38&useEnsembl=false`;
-        const d = await serial('gb', 400, () => fetchRetry(`${GB.replace(/variants$/, 'variant')}?${q}`, {}, 'json', 2));
+        const d = await serial('gb', 400, () => fetchRetry(`${gbBase().replace(/variants$/, 'variant')}?${q}`, {}, 'json', 2));
         x.a.gb = gbRec(x, (d.variants || [])[0] || d);
       } catch (err) {
         const why = err.name === 'TypeError' ? 'blocked by the browser (CORS) or network' : err.message;
@@ -1268,7 +1276,7 @@ function gbCell(a, run) {
   const g = a.gb;
   if (!g) return run ? '<span class="spin"></span>' : '<span class="muted">—</span>';
   const link = `<a href="${esc(g.url)}" target="_blank" rel="noopener">GeneBe</a>`;
-  if (g.failed && g.origin) return `${link}<div class="small muted" title="${esc(GB_ORIGIN_MSG())}">not loaded — GeneBe only answers pages opened at <span class="mono">http://localhost</span> (run <span class="mono">python3 serve.py</span>) ⓘ</div>`;
+  if (g.failed && g.origin) return `${link}<div class="small muted" title="${esc(GB_ORIGIN_MSG())}">not loaded — GeneBe needs a relay when SangerScope runs online (Settings → GeneBe relay URL) ⓘ</div>`;
   if (g.failed) return `${link}<div class="small muted" title="${esc(g.why || '')}">not loaded (${esc(g.why || 'error')}) — open the page</div>`;
   let h = g.comb ? cvClassChip(g.comb) + (g.pheno ? `<div class="vvn" style="font-family:var(--sans)" title="${esc(g.pheno)}">${esc(g.pheno.length > 60 ? g.pheno.slice(0, 60) + '…' : g.pheno)}</div>` : '') : '<span class="muted small">no submitted classification</span>';
   if (g.acmg) h += `<div class="small" title="GeneBe automatic ACMG classification${g.crit ? ': ' + esc(g.crit) : ''}">ACMG auto: <b>${esc(g.acmg)}</b>${g.score != null ? ` (${g.score} pts)` : ''}</div>${g.crit ? `<div class="vvn">${esc(g.crit.replace(/,/g, ', '))}</div>` : ''}`;
@@ -1938,14 +1946,14 @@ function bind() {
   $('#regCopy').onclick = () => { const t = $('#regOut').textContent; if (t) copyText(t, 'Region copied'); };
   // settings
   const dlg = $('#settingsDlg');
-  $('#setBtn').onclick = () => { $('#sHet').value = ST.het; $('#sHetV').textContent = Math.round(ST.het * 100) + '%'; $('#sTrim').checked = ST.trim; $('#sTrimQ').value = ST.trimQ; $('#sEdge').value = ST.edge; $('#sAuto').checked = ST.auto; $('#sKey').value = ST.ncbiKey; $('#sMdKey').value = ST.mdKey || ''; $('#sGbUser').value = ST.gbUser || ''; $('#sGbKey').value = ST.gbKey || ''; dlg.showModal(); };
+  $('#setBtn').onclick = () => { $('#sHet').value = ST.het; $('#sHetV').textContent = Math.round(ST.het * 100) + '%'; $('#sTrim').checked = ST.trim; $('#sTrimQ').value = ST.trimQ; $('#sEdge').value = ST.edge; $('#sAuto').checked = ST.auto; $('#sKey').value = ST.ncbiKey; $('#sMdKey').value = ST.mdKey || ''; $('#sGbUser').value = ST.gbUser || ''; $('#sGbKey').value = ST.gbKey || ''; $('#sGbRelay').value = ST.gbRelay || ''; dlg.showModal(); };
   $('#sHet').oninput = e => { $('#sHetV').textContent = Math.round(e.target.value * 100) + '%'; };
   const applySet = () => { ST.het = +$('#sHet').value; ST.trim = $('#sTrim').checked; ST.trimQ = +$('#sTrimQ').value || 20; ST.edge = +$('#sEdge').value || 0; ST.auto = $('#sAuto').checked; ST.ncbiKey = $('#sKey').value.trim(); ST.mdKey = $('#sMdKey').value.trim(); saveSettings(); READS.forEach(processRead); refresh(); };
   ['sHet', 'sTrim', 'sTrimQ', 'sEdge', 'sAuto'].forEach(id => $('#' + id).addEventListener('change', applySet));
   $('#setClose').onclick = () => { applySet(); dlg.close(); };
   $('#sKey').addEventListener('change', () => { ST.ncbiKey = $('#sKey').value.trim(); saveSettings(); });
   $('#sMdKey').addEventListener('change', () => { ST.mdKey = $('#sMdKey').value.trim(); saveSettings(); });
-  ['sGbUser', 'sGbKey'].forEach(id => $('#' + id).addEventListener('change', () => { ST.gbUser = $('#sGbUser').value.trim(); ST.gbKey = $('#sGbKey').value.trim(); saveSettings(); }));
+  ['sGbUser', 'sGbKey', 'sGbRelay'].forEach(id => $('#' + id).addEventListener('change', () => { ST.gbUser = $('#sGbUser').value.trim(); ST.gbKey = $('#sGbKey').value.trim(); ST.gbRelay = $('#sGbRelay').value.trim(); saveSettings(); }));
   $('#sClearCache').onclick = () => { let n = 0; try { for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if (/^ssv-(ann\d|vv|prod)-/.test(key)) { localStorage.removeItem(key); n++; } } } catch (e) {} toast(`Cleared ${n} cached entries`); };
   window.addEventListener('beforeunload', e => { if (READS.length) { e.preventDefault(); e.returnValue = ''; } });
   window.addEventListener('resize', () => { if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); });
