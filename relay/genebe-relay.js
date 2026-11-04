@@ -12,8 +12,11 @@
  * Settings (Cloudflare dashboard → the worker → Settings → Variables and Secrets):
  *   ALLOWED_ORIGINS  (text, optional)    comma-separated page origins allowed to use the relay.
  *                                        Default: https://clairevaltin.github.io
- *   GENEBE_USER      (secret, optional)  GeneBe account e-mail  } used for every request, which raises the
- *   GENEBE_KEY       (secret, optional)  GeneBe API key         } daily limit; the key never reaches browsers.
+ *   GENEBE_USER      (secret, optional)  GeneBe account e-mail  } fallback for users who entered no key of their
+ *   GENEBE_KEY       (secret, optional)  GeneBe API key         } own. Not recommended: anyone who can call the relay
+ *                                                                  (the Origin check stops browsers, not scripts) would
+ *                                                                  spend this account's GeneBe quota.
+ * Keys typed in SangerScope's settings are passed through to GeneBe unchanged and never stored or logged here.
  */
 const UPSTREAM = 'https://api.genebe.net';
 const PATHS = /^\/cloud\/api-public\/v1\/variants?$/;   // /variant (GET, one variant) and /variants (POST, batch)
@@ -41,8 +44,9 @@ export default {
 
     const headers = {'accept': 'application/json'};
     if (request.method === 'POST') headers['content-type'] = 'application/json';
-    if (env.GENEBE_USER && env.GENEBE_KEY) headers.authorization = 'Basic ' + btoa(`${env.GENEBE_USER}:${env.GENEBE_KEY}`);
-    else if (request.headers.get('authorization')) headers.authorization = request.headers.get('authorization');
+    // The user's own key (SangerScope → Settings → GeneBe account) always wins; the worker's key is only a fallback.
+    if (request.headers.get('authorization')) headers.authorization = request.headers.get('authorization');
+    else if (env.GENEBE_USER && env.GENEBE_KEY) headers.authorization = 'Basic ' + btoa(`${env.GENEBE_USER}:${env.GENEBE_KEY}`);
 
     let res;
     try {

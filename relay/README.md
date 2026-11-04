@@ -19,8 +19,11 @@ site only.
 4. Optional, in the worker's **Settings → Variables and Secrets**:
    - `ALLOWED_ORIGINS` (text): only if your site isn't `https://clairevaltin.github.io`
      (e.g. a custom domain). Comma-separated, no trailing slash.
-   - `GENEBE_USER` and `GENEBE_KEY` (secret): your GeneBe account e-mail and API key, for a
-     higher daily limit. They stay on Cloudflare and never reach the browser.
+   - Leave out `GENEBE_USER` / `GENEBE_KEY` unless you want a shared fallback key. Each user's own
+     key from SangerScope → Settings → GeneBe account is passed through and always takes priority;
+     a fallback key would be usable by anyone who scripts requests to the relay.
+4b. **Turn on two-factor authentication** for the Cloudflare account (My Profile → Authentication).
+    The free plan has no payment method, so it can't run up charges: over the limit it just stops.
 5. Copy the worker URL (`https://sangerscope-genebe.<your-account>.workers.dev`) and either
    - put it in `GB_RELAY_DEFAULT` in `index.html` (works for everyone who opens the site), or
    - paste it in SangerScope → Settings → **GeneBe relay URL** (this browser only).
