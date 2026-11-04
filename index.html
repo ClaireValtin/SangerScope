@@ -327,7 +327,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
     <input type="password" id="sKey" class="inp" style="width:180px" autocomplete="off">
     <div>MobiDetails API key (optional)<small>Free MobiDetails account → profile page. Needed only to create variants MobiDetails doesn't have yet. Stored only in this browser.</small></div>
     <input type="password" id="sMdKey" class="inp" style="width:180px" autocomplete="off">
-    <div>GeneBe account (optional)<small>Username (e-mail) and API key from your GeneBe profile. Raises the anonymous daily query limit. Stored only in this browser.</small></div>
+    <div>GeneBe account (optional)<small>Username (e-mail) and API key from your GeneBe profile. Raises the anonymous daily query limit. Stored only in this browser. GeneBe only answers pages opened at <span class="mono">http://localhost</span>: start SangerScope with <span class="mono">python3 serve.py</span>.</small></div>
     <div class="row"><input type="text" id="sGbUser" class="inp" style="width:140px" placeholder="username" autocomplete="off"><input type="password" id="sGbKey" class="inp" style="width:140px" placeholder="API key" autocomplete="off"></div>
     <div>Annotation cache<small>Results are reused for 7 days. Clear to force fresh ClinVar / gnomAD / MobiDetails data.</small></div>
     <button class="btn sm ghost" id="sClearCache" type="button">Clear cache</button>
@@ -1186,7 +1186,12 @@ const recPos = rec => { for (const s of rec.variation_set || []) for (const l of
 async function clinvarBatch(list) {
   const txBase = R.tx.split('.')[0];
   const accOf = name => (name || '').split('(')[0].split(':')[0].split('.')[0];
-  const has = (rec, c) => (rec.variation_set || []).some(s => s.cdna_change === c && accOf(s.variation_name) === txBase);
+  // cdna_change comes either bare ("c.68A>C") or prefixed ("NM_000518.5(HBB):c.93-21G>A") depending on the record
+  const cOf = s => String(s || '').replace(/^.*:/, '').trim();
+  const has = (rec, c) => (rec.variation_set || []).some(s => cOf(s.cdna_change) === c && accOf(s.variation_name) === txBase);
+  // SNVs: also match on ClinVar's GRCh38 SPDI (0-based position), which does not depend on transcript naming
+  const spdiOf = x => x.v.kind === 'snv' ? `${R.chrAcc}:${x.loc.vcf.pos - 1}:${x.loc.vcf.ref}:${x.loc.vcf.alt}` : null;
+  const hasSpdi = (rec, sp) => !!sp && (rec.variation_set || []).some(s => s.canonical_spdi === sp);
   const single = rec => (rec.variation_set || []).length === 1;
   try {
     let recs = [];
@@ -1199,7 +1204,8 @@ async function clinvarBatch(list) {
     for (const x of list) {
       const c = x.v.hgvs, lo = x.loc.pos, hi = x.loc.pos + Math.max(0, x.loc.len - 1);
       const atPos = recs.filter(r => { const p = recPos(r); return p && p[1] >= lo && p[0] <= hi; });
-      const exact = recs.find(r => single(r) && has(r, c));
+      const sp = spdiOf(x);
+      const exact = recs.find(r => single(r) && has(r, c)) || recs.find(r => single(r) && hasSpdi(r, sp));
       const hap = recs.filter(r => !single(r) && has(r, c));
       x.a.cv = {exact: exact ? cvParse(exact) : null, hap: hap.map(cvParse), near: atPos.filter(r => r !== exact && !hap.includes(r)).map(cvParse)};
       if (!exact && x.v.kind !== 'snv') fallback.push(x);   // indels: ClinVar may anchor them differently → text search
@@ -1220,6 +1226,11 @@ const GB = 'https://api.genebe.net/cloud/api-public/v1/variants';
 const gbUrl = vcf => `https://genebe.net/variant/hg38/chr${vcf.chr}-${vcf.pos}-${vcf.ref}-${vcf.alt}`;
 const gbTxt = c => String(c || '').replace(/_/g, ' ').trim();
 const gbRec = (x, r) => ({url: gbUrl(x.loc.vcf), acmg: gbTxt(r.acmg_classification), score: r.acmg_score ?? null, crit: r.acmg_criteria || '', comb: gbTxt(r.pathogenicity_classification_combined), pheno: r.phenotype_combined || '', cv: gbTxt(r.clinvar_classification), cvDis: r.clinvar_disease || '', rs: r.dbsnp || ''});
+// GeneBe's API only accepts browser (CORS) requests from pages served on http(s)://localhost or genebe.net.
+// From any other origin — GitHub Pages, a file:// page (Origin: null), even http://127.0.0.1 — it answers
+// 403 "Invalid CORS request" and the browser reports a network error. Run SangerScope with serve.py.
+const gbOriginOk = () => location.hostname === 'localhost' || /(^|\.)genebe\.net$/.test(location.hostname);
+const GB_ORIGIN_MSG = () => `GeneBe only accepts requests from pages opened at http://localhost — this page runs from ${location.protocol === 'file:' ? 'a local file' : location.host}. Start SangerScope with serve.py (python3 serve.py) and use the address it opens.`;
 // Batch POST first (JSON body → the browser sends a CORS preflight). If that is refused, fall back to the
 // single-variant GET endpoint: a plain GET without custom headers needs no preflight.
 async function genebeBatch(list) {
@@ -1233,6 +1244,10 @@ async function genebeBatch(list) {
       const vs = d.variants || [];
       chunk.forEach((x, n) => { x.a.gb = gbRec(x, vs[n] || {}); });
     } catch (err) { postErr = err; }
+    if (postErr && postErr.name === 'TypeError' && !gbOriginOk()) {   // refused because of where the page runs: no point retrying per variant
+      chunk.forEach(x => { x.a.gb = {url: gbUrl(x.loc.vcf), failed: true, origin: true, why: 'not available from this address'}; x.a.err.push('GeneBe: ' + GB_ORIGIN_MSG()); });
+      refreshVars(); continue;
+    }
     if (postErr) for (const x of chunk) {
       const v = x.loc.vcf;
       try {
@@ -1253,6 +1268,7 @@ function gbCell(a, run) {
   const g = a.gb;
   if (!g) return run ? '<span class="spin"></span>' : '<span class="muted">—</span>';
   const link = `<a href="${esc(g.url)}" target="_blank" rel="noopener">GeneBe</a>`;
+  if (g.failed && g.origin) return `${link}<div class="small muted" title="${esc(GB_ORIGIN_MSG())}">not loaded — GeneBe only answers pages opened at <span class="mono">http://localhost</span> (run <span class="mono">python3 serve.py</span>) ⓘ</div>`;
   if (g.failed) return `${link}<div class="small muted" title="${esc(g.why || '')}">not loaded (${esc(g.why || 'error')}) — open the page</div>`;
   let h = g.comb ? cvClassChip(g.comb) + (g.pheno ? `<div class="vvn" style="font-family:var(--sans)" title="${esc(g.pheno)}">${esc(g.pheno.length > 60 ? g.pheno.slice(0, 60) + '…' : g.pheno)}</div>` : '') : '<span class="muted small">no submitted classification</span>';
   if (g.acmg) h += `<div class="small" title="GeneBe automatic ACMG classification${g.crit ? ': ' + esc(g.crit) : ''}">ACMG auto: <b>${esc(g.acmg)}</b>${g.score != null ? ` (${g.score} pts)` : ''}</div>${g.crit ? `<div class="vvn">${esc(g.crit.replace(/,/g, ', '))}</div>` : ''}`;
@@ -1318,7 +1334,7 @@ async function mdBatch(list) {   // 3 variants in flight at a time
 }
 
 /* ---- orchestration ---- */
-const annKey = v => `ssv-ann3-${v.key}`;
+const annKey = v => `ssv-ann4-${v.key}`;   // bumped: drops results cached by the old ClinVar matcher
 let annTimer = null; const PENDING = new Set();
 function annotate(key, force = false) {
   if (!force && ANN.has(key)) return;
