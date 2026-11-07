@@ -655,10 +655,10 @@ function findMixed(cb, ts, te) {
      1. anchor: last cleanly aligned base before the mixed region → raw ↔ reference offset
      2. shift: every deletion (+1…+MAXS) and insertion (−1…−MAXS); the best must explain ≥ 80 %
         of positions and beat the reference-only hypothesis clearly
-     3. breakpoint: clean single peaks before, two-allele fit after; inserted bases are read off
-        the non-reference peaks
+     3. breakpoint: clean single peaks before, two-allele fit after; inserted bases — or the replacement
+        bases of a delins, up to HI_SUBST — are read off the non-reference peaks
    Returns an event in gene orientation (normalised later), or null. */
-const HI_MAXS = 30, HI_SPAN = 110;
+const HI_MAXS = 30, HI_SPAN = 110, HI_SUBST = 10;
 function callHetIndel(ab, cb, res, m) {
   const L = R.seq.length, rev = res.rev, n = ab.base.length;
   const refR = rev ? (R.rc || (R.rc = revcomp(R.seq))) : R.seq;           // reference in sequencing direction
@@ -693,33 +693,47 @@ function callHetIndel(ab, cb, res, m) {
     if (!best || sc.f > best.f + 1e-9 || (Math.abs(sc.f - best.f) < 1e-9 && Math.abs(s) < Math.abs(best.s))) best = {...sc, s};
   }
   if (!best || best.f < 0.8 || best.infOk / best.inf < 0.75 || best.f - (wtTot ? wtOk / wtTot : 0) < 0.25) return null;
-  // breakpoint: clean reference before, two-allele fit after (inserted bases are free)
-  const s = best.s, ins = Math.max(0, -s);
-  let bp = -1, bpSc = -1;
-  for (let b = Math.max(anchor - 20, 1); b <= m.a; b++) {
-    let sc = 0;
-    for (let t = Math.max(0, b - 15); t < b; t++) sc += cleanWT(t);
-    for (let t = b + ins; t < Math.min(end, b + ins + 40); t++) sc += fits(t, s) ? 1 : 0;
-    if (sc > bpSc) { bpSc = sc; bp = b; }
+  // breakpoint b and allele-2 stretch length nIns: clean reference before b; allele 2 reads nIns free bases from b
+  // (an insertion, or the replacement bases of a delins), then resumes on the reference shifted by s.
+  // A free position must show the reference peak plus a second one; extra free bases are only taken when they explain
+  // positions the plain shift model cannot (ties keep the simplest model), so pure deletions/insertions stay pure.
+  const s = best.s, ins0 = Math.max(0, -s);
+  const twoPk = t => { const w = refAt(t + off), x = top2(t); return (x.p === w || x.s === w) && (x.r >= 0.15 || x.p === w) ? 1 : 0; };   // allele 1 = reference; the replacement base may equal it
+  // every candidate (b, nIns) is scored over the same fixed stretch [lo, hi): clean before b, free bases, two-allele fit after
+  const bLo = Math.max(anchor - 20, 1), bHi = m.a, lo = Math.max(0, bLo - 15), hi = Math.min(end, bHi + ins0 + HI_SUBST + 40);
+  const pre = f => { const a = new Float64Array(hi - lo + 1); for (let t = lo; t < hi; t++) a[t - lo + 1] = a[t - lo] + f(t); return (x, y) => { x = Math.max(lo, Math.min(hi, x)); y = Math.max(lo, Math.min(hi, y)); return y > x ? a[y - lo] - a[x - lo] : 0; }; };
+  const sClean = pre(cleanWT), sTwo = pre(twoPk), sFit = pre(t => fits(t, s) ? 1 : 0);
+  let bp = -1, bpSc = -Infinity, nIns = ins0;
+  for (let extra = 0; extra <= HI_SUBST; extra++) {
+    const ni = ins0 + extra;
+    for (let b = bLo; b <= bHi; b++) {
+      const sc = sClean(lo, b) + sTwo(b, b + ni) + sFit(b + ni, hi) - 0.3 * extra;   // each replacement base must earn its place
+      if (sc > bpSc + 1e-9) { bpSc = sc; bp = b; nIns = ni; }
+    }
   }
   if (bp < 0) return null;
+  const ins = nIns, nDel = nIns + s;   // allele 2 = ref[…j−1] + X (nIns bases) + ref[j + nDel…]
   const j = bp + off;   // reference index (sequencing direction) where the two alleles part
-  let ev;
-  if (s > 0) {
-    const gs = rev ? L - 1 - (j + s - 1) : j, ge = rev ? L - 1 - j : j + s - 1;
-    if (gs < 0 || ge >= L) return null;
-    ev = {kind: 'del', s: gs, e: ge, ref: R.seq.slice(gs, ge + 1), alt: ''};
-  } else {
-    let X = ''; for (let t = bp; t < bp + ins; t++) { const w = refAt(t + off), x = top2(t); X += x.r >= 0.15 && x.p === w ? x.s : x.p; }
-    ev = {kind: 'ins', p: rev ? L - 1 - j : j - 1, alt: rev ? revcomp(X) : X};
-    if (ev.p < 0 || ev.p >= L - 1) return null;
-  }
   // allele balance: second-allele / reference peak height where the alleles differ
   const rat = [];
   for (let t = bp + ins; t < end && rat.length < 60; t++) { const w = refAt(t + off), mu = refAt(t + off + s); if (w !== mu && w !== 'N' && mu !== 'N' && fits(t, s)) { const h = hts(t); if (h[w] > 0) rat.push(h[mu] / h[w]); } }
   rat.sort((a, b) => a - b);
+  const medRat = rat.length ? rat[rat.length >> 1] : null;
+  // inserted / replacement bases: a minor peak counts as allele 2 only if it is about as tall as allele 2 elsewhere;
+  // otherwise allele 2 has the reference base there too (common in duplications) and the minor peak is noise
+  const minor = Math.min(0.5, Math.max(0.15, 0.5 * Math.min(1, medRat ?? 0.3)));
+  let X = ''; for (let t = bp; t < bp + ins; t++) { const w = refAt(t + off), x = top2(t); X += x.r >= minor && x.p === w ? x.s : x.p; }
+  let ev;
+  if (nDel > 0) {
+    const gs = rev ? L - 1 - (j + nDel - 1) : j, ge = rev ? L - 1 - j : j + nDel - 1;
+    if (gs < 0 || ge >= L) return null;
+    ev = {kind: ins ? 'delins' : 'del', s: gs, e: ge, ref: R.seq.slice(gs, ge + 1), alt: rev ? revcomp(X) : X};
+  } else {
+    ev = {kind: 'ins', p: rev ? L - 1 - j : j - 1, alt: rev ? revcomp(X) : X};
+    if (ev.p < 0 || ev.p >= L - 1) return null;
+  }
   const gBreak = rev ? L - 1 - j : j;
-  return {ev, shift: s, fit: best.f, nPos: best.tot, ratio: rat.length ? rat[rat.length >> 1] : null, rawBreak: bp, zone: rev ? [-Infinity, gBreak] : [gBreak, Infinity]};
+  return {ev, shift: s, fit: best.f, nPos: best.tot, ratio: medRat, rawBreak: bp, zone: rev ? [-Infinity, gBreak] : [gBreak, Infinity]};
 }
 
 /* =====================================================================
@@ -831,7 +845,11 @@ function processRead(r) {
   // past a het indel the rest of the read is a two-allele mixture)
   res.het = null;
   if (r.ab) for (const m of res.mixed) { const h = callHetIndel(r.ab, cb, res, m); if (h) { m.call = h; m.shift = h.shift; m.frac = h.fit; m.a = h.rawBreak; m.beyondTrim = h.rawBreak > te; res.het = h; break; } }
-  res.mixed = res.mixed.filter(m => m.call || m.shift || !m.beyondTrim);
+  // unresolved regions past the trim end are usually end-of-read decay — but one that starts right where trimming
+  // stopped, well before the end of the read, is the signature of a heterozygous indel the deconvolution could not
+  // resolve (compound het, > 30 bp, complex): keep it so it is reported instead of silently dropped
+  const atTrim = m => m.a - te <= 5 && m.b - m.a + 1 >= 30 && te < calls.length - 60;
+  res.mixed = res.mixed.filter(m => m.call || m.shift || !m.beyondTrim || atTrim(m));
   if (res.het) {   // identity only over the single-allele part: the mixed part is two superposed sequences
     let al = 0, id = 0; const z = res.het.zone;
     for (let c = 0; c < qi.length; c++) { if (rj[c] >= 0 && rj[c] >= z[0] && rj[c] <= z[1]) continue; al++; if (qi[c] >= 0 && rj[c] >= 0 && SC[q.charCodeAt(qi[c]) * 128 + R.seq.charCodeAt(rj[c])] > 0) id++; }
@@ -855,6 +873,7 @@ function processRead(r) {
   }
   // duplicate detection key
   res.sig = q.slice(0, 400);
+  res.ambig = [];
   res.events = extractEvents(r, res);
   if (res.het) {
     const h = res.het, z = h.zone, inZone = e => { const i = e.kind === 'ins' && e.s == null ? e.p : e.s; return i >= z[0] && i <= z[1]; };
@@ -871,20 +890,22 @@ function extractEvents(r, res) {
   const isGap = c => qi[c] < 0 || rj[c] < 0;
   const plainMM = c => qi[c] >= 0 && rj[c] >= 0 && 'ACGT'.includes(q[qi[c]]) && q[qi[c]] !== ref[rj[c]];
   const isMatch = c => c < n && qi[c] >= 0 && rj[c] >= 0 && q[qi[c]] === ref[rj[c]];
-  // HGVS: changes in the same read separated by ≤ 1 unchanged nucleotide form one delins (hom calls only; het phase is unknown)
+  // HGVS: changes in the same read separated by ≤ 1 unchanged nucleotide form one delins (hom calls only; het phase is unknown).
+  // Adjacent homozygous substitutions are therefore one delins too: two changes in one codon must be translated together.
   const blocky = c => c < n && (isGap(c) || plainMM(c));
   const joins = c => blocky(c) || (isMatch(c) && blocky(c + 1));
   const blockEnd = c => { let b = c; while (b + 1 < n && joins(b + 1)) { b++; if (isMatch(b)) b++; } while (b > c && isMatch(b)) b--; return b; };
-  const hasGap = (a, b) => { for (let x = a; x <= b; x++) if (isGap(x)) return true; return false; };
+  const changed = c => c >= 0 && c < n && (isGap(c) || (qi[c] >= 0 && rj[c] >= 0 && q[qi[c]] !== ref[rj[c]] && q[qi[c]] !== 'N'));
   let c = 0;
   while (c < n) {
-    if (!isGap(c) && !(plainMM(c) && joins(c + 1) && hasGap(c, blockEnd(c)))) {
+    if (!isGap(c) && !(plainMM(c) && joins(c + 1))) {
       const a = q[qi[c]], b = ref[rj[c]], i = rj[c];
       if (a !== b && a !== 'N' && b !== 'N') {
         const rawI = res.rawOf(qi[c]);
         const base = {s: i, e: i, rawI, q: qualAt(rawI), ratio: res.ratio ? res.ratio[rawI] : null, edge: c < EDGE || c > n - 1 - EDGE, mixed: inMix(res, i)};
         const set = IUPAC[a] || '';
-        if (set.length === 1) ev.push({...base, kind: 'snv', ref: b, alt: a, zyg: 'hom', adj: plainMM(c - 1) || plainMM(c + 1) || plainMM(c - 2) && isMatch(c - 1) || plainMM(c + 2) && isMatch(c + 1)});
+        base.adj = changed(c - 1) || changed(c + 1) || (changed(c - 2) && isMatch(c - 1)) || (changed(c + 2) && isMatch(c + 1));   // only next to a het change now: phase unknown
+        if (set.length === 1) ev.push({...base, kind: 'snv', ref: b, alt: a, zyg: 'hom', cols: [c, c]});
         else if (set.length === 2) {
           if (set.includes(b)) ev.push({...base, kind: 'snv', ref: b, alt: set.replace(b, ''), zyg: 'het'});
           else for (const x of set) ev.push({...base, kind: 'snv', ref: b, alt: x, zyg: 'het', twoAlt: true});
@@ -895,17 +916,35 @@ function extractEvents(r, res) {
     // indel / MNV block: gaps and plain mismatches, bridging single unchanged nucleotides
     let a = c, b = blockEnd(c);
     let refA = '', alt = '', firstR = -1, lastR = -1;
-    for (let x = a; x <= b; x++) { if (rj[x] >= 0) { refA += ref[rj[x]]; if (firstR < 0) firstR = rj[x]; lastR = rj[x]; } if (qi[x] >= 0) alt += (IUPAC[q[qi[x]]] || 'N')[0]; }
+    for (let x = a; x <= b; x++) { if (rj[x] >= 0) { refA += ref[rj[x]]; if (firstR < 0) firstR = rj[x]; lastR = rj[x]; } if (qi[x] >= 0) alt += q[qi[x]]; }
     let prevR = -1; for (let x = a - 1; x >= 0; x--) if (rj[x] >= 0) { prevR = rj[x]; break; }
+    if (/[^ACGT]/.test(alt)) {   // N / IUPAC base inside an indel: the inserted sequence is unknown — never guess it
+      res.ambig.push({i: firstR >= 0 ? firstR : prevR, alt}); c = b + 1; continue;
+    }
     let rawI = -1; for (let x = a; x >= 0; x--) if (qi[x] >= 0) { rawI = res.rawOf(qi[x]); break; }
     const base = {rawI, q: qualAt(rawI), ratio: null, edge: a < EDGE || b > n - 1 - EDGE, zyg: 'hom', mixed: false};
     if (!refA) ev.push({...base, kind: 'ins', p: prevR, alt});
     else ev.push({...base, kind: alt ? 'delins' : 'del', s: firstR, e: lastR, ref: refA, alt});
     base.mixed = inMix(res, firstR >= 0 ? firstR : prevR);
-    ev[ev.length - 1].mixed = base.mixed;
+    ev[ev.length - 1].mixed = base.mixed; ev[ev.length - 1].cols = [a, b];
     c = b + 1;
   }
-  return ev.map(e => Object.assign(e, normalize(e))).filter(e => e.hgvs);
+  const out = ev.map(e => Object.assign(e, normalize(e))).filter(e => e.hgvs);
+  // homozygous changes a few nucleotides apart in one read are in cis: HGVS lists them separately (≥ 2 nt apart) but
+  // their protein effect must be judged together (e.g. two compensating frameshifts = one in-frame change)
+  const CIS = 12, hom = out.filter(e => e.zyg === 'hom' && e.cols).sort((x, y) => x.cols[0] - y.cols[0]);
+  for (let k = 0; k < hom.length;) {
+    let g = k; while (g + 1 < hom.length && hom[g + 1].cols[0] - hom[g].cols[1] <= CIS) g++;
+    if (g > k) {
+      const a = hom[k].cols[0], b = hom[g].cols[1]; let refA = '', alt = '', s0 = -1, e0 = -1, prevR = -1;
+      for (let x = a - 1; x >= 0; x--) if (rj[x] >= 0) { prevR = rj[x]; break; }
+      for (let x = a; x <= b; x++) { if (rj[x] >= 0) { refA += ref[rj[x]]; if (s0 < 0) s0 = rj[x]; e0 = rj[x]; } if (qi[x] >= 0) alt += q[qi[x]]; }
+      const m = /[^ACGT]/.test(alt) ? null : refA ? normalize({kind: 'delins', s: s0, e: e0, ref: refA, alt}) : normalize({kind: 'ins', p: prevR, alt});
+      if (m && m.hgvs) for (let x = k; x <= g; x++) hom[x].cis = {...m, parts: hom.slice(k, g + 1).map(e => e.hgvs)};
+    }
+    k = g + 1;
+  }
+  return out;
 }
 
 /* HGVS normalisation (3′ rule in transcript orientation) */
@@ -942,7 +981,9 @@ function normalize(ev) {
    Returns null when the change crosses an exon/intron junction (no clean mRNA edit). */
 function protEffect(v) {
   const M = R.mpos; let m1, m2;   // mRNA m1…m2 (1-based, inclusive; m2 = m1 − 1 for a pure insertion) → alt
-  if (v.kind === 'ins' || v.kind === 'dup') { const p = v.kind === 'dup' ? v.e : v.s; if (!M[p] || M[p + 1] !== M[p] + 1) return null; m1 = M[p] + 1; m2 = M[p]; }
+  if (v.kind === 'dup') {   // the copy follows v.e: a clean mRNA edit whenever the duplicated stretch is exonic (also at an exon's last base)
+    if (!M[v.s] || !M[v.e] || M[v.e] - M[v.s] !== v.e - v.s) return null; m1 = M[v.e] + 1; m2 = M[v.e];
+  } else if (v.kind === 'ins') { const p = v.s; if (!M[p] || M[p + 1] !== M[p] + 1) return null; m1 = M[p] + 1; m2 = M[p]; }
   else { if (!M[v.s] || !M[v.e] || M[v.e] - M[v.s] !== v.e - v.s) return null; m1 = M[v.s]; m2 = M[v.e]; }
   const alt = v.alt || '', cS = R.cdsS, cE = R.cdsE, delta = alt.length - (m2 - m1 + 1), fs = delta % 3 !== 0;
   const nk = v.kind === 'del' ? 'deletion' : v.kind === 'dup' ? 'duplication' : v.kind === 'ins' ? 'insertion' : 'delins';
@@ -958,11 +999,12 @@ function protEffect(v) {
   if (Mu[i] === '*') return {p: `p.(${A(i)}Ter)`, type: fs ? 'frameshift' : 'stop gained'};
   if (P[i] === '*') return {p: `p.(Ter${i + 1}${AA3[Mu[i]]}extTer${toStop})`, type: 'stop lost'};
   if (fs) return {p: `p.(${A(i)}${AA3[Mu[i]]}fsTer${toStop})`, type: 'frameshift'};
+  // in-frame change that creates a premature stop (the original stop codon, shifted by delta, is never reached)
+  if (stopAt >= 0 && m2 < cE - 2 && cS + 3 * stopAt < cE - 2 + delta) return {p: `p.(${A(i)}delins${three(Mu.slice(i, stopAt + 1))})`, type: 'stop gained'};
   // in-frame: trim the common suffix, then name the protein change
   let j = 0; while (j < P.length - i && j < Mu.length - i && P[P.length - 1 - j] === Mu[Mu.length - 1 - j]) j++;
   const delP = P.slice(i, P.length - j); let insM = Mu.slice(i, Mu.length - j);
   if (stopAt < 0) return {p: `p.(${A(i)}_Ter${P.length}delins${three(insM)}extTer?)`, type: 'stop lost'};
-  if (insM.includes('*')) { insM = insM.slice(0, insM.indexOf('*') + 1); return {p: delP.length > 1 ? `p.(${A(i)}_${A(i + delP.length - 1)}delins${three(insM)})` : delP.length ? `p.(${A(i)}delins${three(insM)})` : `p.(${A(i - 1)}_${A(i)}ins${three(insM)})`, type: 'stop gained'}; }
   if (!delP.length) {   // insertion: shift 3′, then check for a duplication
     let a = i; while (a < P.length - 1 && P[a] === insM[0]) { insM = insM.slice(1) + insM[0]; a++; }
     const n = insM.length;
@@ -1034,7 +1076,7 @@ function computeVariants() {
     if (e.mixed && e.kind === 'snv' && e.zyg === 'het') continue; // suppressed inside mixed traces
     let v = map.get(e.hgvs);
     if (!v) { v = {key: R.tx + ':' + e.hgvs, hgvs: e.hgvs, kind: e.kind, s: e.s, e: e.e, ref: e.ref, alt: e.alt, sup: [], other: []}; map.set(e.hgvs, v); }
-    if (!v.sup.some(s => s.r === r)) v.sup.push({r, zyg: e.zyg, q: e.q, ratio: e.ratio, edge: e.edge, twoAlt: e.twoAlt, rawI: e.rawI, mixed: e.mixed, adj: e.adj, hetIndel: e.hetIndel, fit: e.fit, nPos: e.nPos});
+    if (!v.sup.some(s => s.r === r)) v.sup.push({r, zyg: e.zyg, q: e.q, ratio: e.ratio, edge: e.edge, twoAlt: e.twoAlt, rawI: e.rawI, mixed: e.mixed, adj: e.adj, cis: e.cis, hetIndel: e.hetIndel, fit: e.fit, nPos: e.nPos});
   }
   for (const v of map.values()) {
     for (const r of reads) {
@@ -1058,7 +1100,9 @@ function computeVariants() {
     if (v.sup.some(s => s.mixed)) f.push({t: 'inside mixed-trace region', c: 'r'});
     const hi = v.sup.find(s => s.hetIndel);
     if (hi) f.push({t: `het indel from trace deconvolution (${Math.round(hi.fit * 100)}% of ${hi.nPos} positions fit)`, c: 'g'});
-    if (v.sup.some(s => s.adj)) f.push({t: 'next to another change — HGVS: one delins if in cis', c: 'g'});
+    const cis = v.sup.find(s => s.cis)?.cis;
+    if (cis) { const ce = consequence(cis); v.cis = {hgvs: cis.hgvs, p: ce.p, type: ce.type}; f.push({t: `in cis with ${cis.parts.filter(h => h !== v.hgvs).join(', ')} (same read, homozygous) — together ${cis.hgvs}${ce.p ? ' ' + ce.p : ''} (${ce.type || ce.loc}): judge the combined effect`, c: 'r'}); }
+    if (v.sup.some(s => s.adj)) f.push({t: 'next to a heterozygous change — HGVS: one delins if in cis (phase unknown)', c: 'g'});
     const qs = v.sup.map(s => s.q).filter(q => q != null);
     if (qs.length && Math.max(...qs) < 20 && v.zyg !== 'het') f.push({t: `low quality (Q${Math.max(...qs)})`, c: ''});
     if (v.zyg === 'het' && v.sup.some(s => s.r.ab)) f.push({t: 'check trace', c: 'g'});
@@ -1641,10 +1685,12 @@ function renderFlags() {
     if (x.status !== 'ok') continue;
     for (const m of x.mixInfo) {
       const where = `${m.approx ? '~' : ''}c.${cLabel(m.start)}`, dirTxt = x.rev ? 'towards the 5′ end of the gene' : 'towards the 3′ end of the gene';
-      if (m.call?.hgvs) out.push(['r', `${r.name}: heterozygous ${m.call.hgvs} called by trace deconvolution — from ${where} (${dirTxt}) the trace is two alleles offset by ${Math.abs(m.shift)} bp (${m.shift > 0 ? 'deletion' : 'insertion'}); ${Math.round(m.call.fit * 100)}% of ${m.call.nPos} positions fit, second allele ≈ ${Math.round((m.call.ratio || 0) * 100)}% of reference peak height. Confirm with the opposite read; other calls in this stretch are suppressed.`]);
+      if (m.call?.hgvs) out.push(['r', `${r.name}: heterozygous ${m.call.hgvs} called by trace deconvolution — from ${where} (${dirTxt}) the trace is two alleles offset by ${Math.abs(m.shift)} bp (${m.call.ev.kind === 'delins' ? 'deletion-insertion' : m.shift > 0 ? 'deletion' : 'insertion'}); ${Math.round(m.call.fit * 100)}% of ${m.call.nPos} positions fit, second allele ≈ ${Math.round((m.call.ratio || 0) * 100)}% of reference peak height. Confirm with the opposite read; other calls in this stretch are suppressed.`]);
       else if (m.shift) out.push(['r', `${r.name}: heterozygous indel signature — from ${where} (${dirTxt}) the secondary peaks repeat the main sequence shifted by ${Math.abs(m.shift)} bp (${Math.round(m.frac * 100)}% of secondary peaks fit). Likely a heterozygous ${Math.abs(m.shift)}-bp insertion/deletion near ${where}${m.beyondTrim ? '; the read was quality-trimmed right there' : ''}. Confirm on the trace and with the opposite read; SNV calls in this stretch are suppressed.`]);
+      else if (m.beyondTrim) out.push(['r', `${r.name}: the trace turns mixed from ${where} (${dirTxt}), exactly where quality trimming stopped the read — typical of a heterozygous indel that could not be resolved (two different indels, > 30 bp, or a complex change). Nothing after ${where} is called from this read: inspect the trace and sequence from the opposite side.`]);
       else out.push(['', `${r.name}: mixed/overlapping trace from ${where} — no consistent indel shift found (noise, contamination or several variants). Inspect the trace; heterozygous SNV calls in this stretch are suppressed.`]);
     }
+    for (const a of x.ambig || []) out.push(['r', `${r.name}: ambiguous base call(s) "${a.alt}" inside an insertion/deletion near c.${cLabel(Math.max(0, a.i))} — not called, because the inserted sequence is unknown. Inspect the trace (often basecaller noise).`]);
     if (sigs.has(x.sig)) out.push(['', `${r.name} looks identical to ${sigs.get(x.sig)} (duplicate file?).`]); else sigs.set(x.sig, r.name);
   }
   for (const v of VARS) if (v.other.length && v.zyg === 'het') out.push(['', `${v.hgvs}: heterozygous in ${v.sup.map(s => s.r.name).join(', ')} but plain reference in ${v.other.map(o => o.r.name + (o.alt != null ? ` (alt peak ${Math.round(o.alt * 100)}% of reference)` : '')).join(', ')} — check both traces.`]);
