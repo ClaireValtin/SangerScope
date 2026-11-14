@@ -267,7 +267,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
   <section class="card">
     <h2><span class="n">4</span>Coverage<span class="rt">click the map to jump the alignment there</span></h2>
     <div class="toolbar">
-      <label>Target <select id="covScope" class="inp"><option value="auto">Exons with reads</option><option value="cds">Whole CDS</option><option value="exons">Chosen exons</option></select></label>
+      <label>Target <select id="covScope" class="inp"><option value="auto">Exons with reads</option><option value="cds">Whole CDS</option><option value="gene">Whole gene (exons + introns + UTRs)</option><option value="exons">Chosen exons</option></select></label>
       <input id="covExons" class="inp mono" placeholder="exons, e.g. 3, 5-7" style="width:170px;display:none">
       <input id="covPos" class="inp mono" placeholder="Key positions, e.g. 1799T&gt;A, 340+5" style="flex:1;min-width:220px" title="Positions you must see (familial variant, hotspot…). Each one gets a covered / genotype check. Saved per gene.">
     </div>
@@ -1453,7 +1453,7 @@ function renderReads() {
 
 /* ---------- coverage map ---------- */
 let LAYOUT = null;
-function buildLayout(W) {
+function buildLayout(W, linear) {   // linear: introns/UTRs drawn to scale (whole-gene target), flanks stay compressed
   const segs = [], E = R.exons;
   const push = (s, e, kind, ex) => { if (e >= s) segs.push({s, e, kind, ex}); };
   push(0, E[0].s - 1, 'flank');
@@ -1463,15 +1463,16 @@ function buildLayout(W) {
     if (k < E.length - 1) push(x.e + 1, E[k + 1].s - 1, 'intron', x.n);
   });
   push(E[E.length - 1].e + 1, R.seq.length - 1, 'flank');
-  const comp = segs.filter(s => s.kind !== 'cds');
+  const scaled = s => s.kind === 'cds' || (linear && s.kind !== 'flank');
+  const comp = segs.filter(s => !scaled(s));
   const cap = Math.max(10, Math.min(48, (0.42 * W) / Math.max(1, comp.length)));
   let used = 0;
   for (const s of comp) { const len = s.e - s.s + 1; s.w = Math.min(cap, Math.max(6, 4 + Math.log10(len + 1) * 9)); if (s.kind === 'utr') s.w = Math.min(s.w, Math.max(4, len * 0.6)); used += s.w; }
-  const cds = segs.filter(s => s.kind === 'cds'), totC = cds.reduce((a, s) => a + s.e - s.s + 1, 0);
+  const cds = segs.filter(scaled), totC = cds.reduce((a, s) => a + s.e - s.s + 1, 0);
   const avail = Math.max(W - used, W * 0.3);
   for (const s of cds) s.w = Math.max(3, (s.e - s.s + 1) / totC * avail);
   const sum = segs.reduce((a, s) => a + s.w, 0), k = W / sum; let x = 0;
-  for (const s of segs) { s.w *= k; s.x = x; x += s.w; s.comp = s.kind !== 'cds' && (s.e - s.s + 1) * (avail * k / totC) > s.w * 1.5; }
+  for (const s of segs) { s.w *= k; s.x = x; x += s.w; s.comp = !scaled(s) && (s.e - s.s + 1) * (avail * k / totC) > s.w * 1.5; }
   return segs;
 }
 function xOf(i) { const S = LAYOUT; let lo = 0, hi = S.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S[m].s <= i) lo = m; else hi = m - 1; } const s = S[lo]; return s.x + (Math.min(Math.max(i, s.s), s.e + 1) - s.s) / (s.e - s.s + 1) * s.w; }
@@ -1491,12 +1492,17 @@ function exonRanges(nums) { const a = [...nums].sort((x, y) => x - y), out = [];
 const codingExons = () => R.exons.filter(e => { for (let i = e.s; i <= e.e; i++) if (isCoding(i)) return true; return false; });
 function coverageTarget(cov) {
   const cex = codingExons(); let set;
+  if (SCOPE.mode === 'gene') {   // whole transcribed region: first exon start → last exon end, introns and UTRs included
+    const E = R.exons, mask = new Uint8Array(R.seq.length), a = E[0].s, b = E[E.length - 1].e, idx = new Int32Array(b - a + 1);
+    for (let i = a; i <= b; i++) { mask[i] = 1; idx[i - a] = i; }
+    return {set: new Set(E.map(e => e.n)), mask, idx, gene: true, unit: 'bp (exons + introns + UTRs)', label: 'whole gene'};
+  }
   if (SCOPE.mode === 'cds') set = new Set(cex.map(e => e.n));
   else if (SCOPE.mode === 'exons') { const want = parseExonList(SCOPE.exons); set = new Set(cex.filter(e => want.has(e.n)).map(e => e.n)); }
   else { set = new Set(); for (const e of cex) for (let i = e.s; i <= e.e; i++) if (isCoding(i) && (cov.f[i] || cov.rv[i])) { set.add(e.n); break; } }
   const mask = new Uint8Array(R.seq.length); for (const e of R.exons) if (set.has(e.n)) for (let i = e.s; i <= e.e; i++) if (isCoding(i)) mask[i] = 1;
   const label = SCOPE.mode === 'cds' || (set.size === cex.length && set.size) ? 'whole CDS' : set.size ? `exon${set.size > 1 ? 's' : ''} ${exonRanges(set)}` : 'none yet';
-  return {set, mask, label};
+  return {set, mask, idx: R.coding, gene: false, unit: 'coding bp', label};
 }
 function keyPositions(cov) {
   const out = [];
@@ -1521,9 +1527,10 @@ function keyPosText(k) {
 function renderCoverage() {
   const svg = $('#covSvg');
   if (!R) { svg.setAttribute('viewBox', '0 0 1200 40'); svg.innerHTML = `<text x="16" y="24">Load a gene to see the coverage map.</text>`; $('#covStats').innerHTML = ''; $('#exonChips').innerHTML = ''; $('#covGaps').innerHTML = ''; $('#covTargets').innerHTML = ''; return; }
-  const W = 1200, PADX = 10, IW = W - 2 * PADX; LAYOUT = buildLayout(IW); const X = i => PADX + xOf(i);
+  const W = 1200, PADX = 10, IW = W - 2 * PADX;
   const cov = coverageArrays(), reads = goodReads();
   const tg = coverageTarget(cov);
+  LAYOUT = buildLayout(IW, tg.gene && R.exons[R.exons.length - 1].e - R.exons[0].s < 60000); const X = i => PADX + xOf(i);
   let y = 0, h = '';
   // exon labels + gene model (exons outside the target are faded)
   const gy = 30;
@@ -1562,13 +1569,15 @@ function renderCoverage() {
   y += 6;
   svg.setAttribute('viewBox', `0 0 ${W} ${y}`); svg.style.height = 'auto'; svg.innerHTML = h;
   // stats — measured over the target, whole CDS shown for reference
-  const C = R.coding; let n = 0, c1 = 0, c2 = 0, w1 = 0;
-  for (let k = 0; k < C.length; k++) { const i = C[k], any = cov.f[i] || cov.rv[i]; if (any) w1++; if (!tg.mask[i]) continue; n++; if (any) c1++; if (cov.f[i] && cov.rv[i]) c2++; }
+  const CD = R.coding; let n = 0, c1 = 0, c2 = 0, w1 = 0;
+  for (let k = 0; k < CD.length; k++) if (cov.f[CD[k]] || cov.rv[CD[k]]) w1++;
+  const C = tg.idx;
+  for (let k = 0; k < C.length; k++) { const i = C[k], any = cov.f[i] || cov.rv[i]; if (!tg.mask[i]) continue; n++; if (any) c1++; if (cov.f[i] && cov.rv[i]) c2++; }
   const pc = (v, d) => d ? (v / d * 100).toFixed(v === d ? 0 : 1) + '%' : '—';
-  R.covStat = {n, c1, c2, label: tg.label, whole: pc(w1, C.length), keys: keyPositions(cov).map(keyPosText)};
+  R.covStat = {n, c1, c2, label: tg.label, whole: pc(w1, CD.length), unit: tg.unit, keys: keyPositions(cov).map(keyPosText)};
   $('#covStats').innerHTML = `<div class="stat"><div class="v">${pc(c1, n)}</div><div class="l">target covered ≥1 read</div></div><div class="stat"><div class="v">${pc(c2, n)}</div><div class="l">target forward + reverse</div></div>` +
     `<div class="stat"><div class="v">${n - c1}</div><div class="l">target bp missing</div></div>` +
-    `<div class="stat"><div class="v" style="font-size:15px;padding:3px 0">${esc(tg.label)}</div><div class="l">target · ${n} coding bp · whole CDS ${pc(w1, C.length)}</div></div>`;
+    `<div class="stat"><div class="v" style="font-size:15px;padding:3px 0">${esc(tg.label)}</div><div class="l">target · ${n} ${tg.unit} · whole CDS ${pc(w1, CD.length)}</div></div>`;
   // exon chips
   $('#exonChips').innerHTML = R.exons.map(e => {
     let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; }
@@ -1579,7 +1588,7 @@ function renderCoverage() {
   // gaps inside the target only
   const gaps = []; let gs = -1, gl = 0;
   for (let k = 0; k <= C.length; k++) { const i = C[k]; if (k < C.length && !tg.mask[i]) { if (gs >= 0) { gaps.push([C[gs], C[k - 1], gl]); gs = -1; } continue; } const un = k < C.length && !(cov.f[i] || cov.rv[i]); if (un) { if (gs < 0) { gs = k; gl = 0; } gl++; } if (!un && gs >= 0) { gaps.push([C[gs], C[k - 1], gl]); gs = -1; } }
-  $('#covGaps').innerHTML = !reads.length && SCOPE.mode === 'auto' ? '<span class="muted">Add reads to measure coverage. Target = coding exons your reads touch; switch to “Whole CDS” or “Chosen exons” for a fixed target.</span>' : !n ? '<span class="muted">No coding exon in the target.</span>' : gaps.length ? `<b>Gaps in target:</b> ${gaps.slice(0, 14).map(([a, b, l]) => `<span class="mono">${cRange(a, b)}</span> <span class="muted">(${l} bp)</span>`).join(' · ')}${gaps.length > 14 ? ` · +${gaps.length - 14} more` : ''}` : `<b style="color:var(--green)">Entire target covered (${esc(tg.label)}).</b>`;
+  $('#covGaps').innerHTML = !reads.length && SCOPE.mode === 'auto' ? '<span class="muted">Add reads to measure coverage. Target = coding exons your reads touch; switch to “Whole CDS”, “Whole gene” or “Chosen exons” for a fixed target.</span>' : !n ? '<span class="muted">No coding exon in the target.</span>' : gaps.length ? `<b>Gaps in target:</b> ${gaps.slice(0, 14).map(([a, b, l]) => `<span class="mono">${cRange(a, b)}</span> <span class="muted">(${l} bp)</span>`).join(' · ')}${gaps.length > 14 ? ` · +${gaps.length - 14} more` : ''}` : `<b style="color:var(--green)">Entire target covered (${esc(tg.label)}).</b>`;
   // key positions list
   $('#covTargets').innerHTML = keyPositions(cov).map(k => {
     if (k.bad) return `<div class="t"><span class="fl r">${esc(k.tok)}: not a valid c. position</span></div>`;
@@ -1863,7 +1872,7 @@ async function exportXlsx() {
       ['Gene', `${R.symbol} — ${R.tx}${R.select === 'MANE_SELECT' ? ' (MANE Select)' : ''} · ${R.np}${R.ccds ? ' · ' + R.ccds : ''} · ${R.chrAcc} (GRCh38)`],
       ['Analysis date', today],
       ['Reads', reads.map(r => `${r.name}${r.res.rev ? '←' : '→'} ${cRange(r.res.rs, r.res.re)}`).join('; ') || 'none'],
-      ['Coverage', cs.n ? `Target ${cs.label}: ${(cs.c1 / cs.n * 100).toFixed(1)}% ≥1 read · ${(cs.c2 / cs.n * 100).toFixed(1)}% forward + reverse (${cs.n} coding bp) · whole CDS ${cs.whole}` : `no target · whole CDS ${cs.whole || '0%'}`],
+      ['Coverage', cs.n ? `Target ${cs.label}: ${(cs.c1 / cs.n * 100).toFixed(1)}% ≥1 read · ${(cs.c2 / cs.n * 100).toFixed(1)}% forward + reverse (${cs.n} ${cs.unit}) · whole CDS ${cs.whole}` : `no target · whole CDS ${cs.whole || '0%'}`],
       ['Key positions', (cs.keys || []).join('; ') || '—'],
     ];
     ws.mergeCells(`A1:${LAST}1`); ws.getCell('A1').value = `Sanger sequencing results — ${R.symbol} — ${patient}`;
@@ -1901,6 +1910,11 @@ async function exportXlsx() {
     w2.addRow([]); w2.addRow(['Exon', 'Coding bp', 'Covered', 'Forward + reverse', 'In target']).font = {bold: true};
     const cov = coverageArrays(), tg = coverageTarget(cov);
     for (const e of R.exons) { let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; } if (nc) w2.addRow([e.n, nc, `${k1} (${Math.round(k1 / nc * 100)}%)`, `${k2} (${Math.round(k2 / nc * 100)}%)`, tg.set.has(e.n) ? 'yes' : 'no']); }
+    if (tg.gene) {   // whole-gene target: also report every intron and UTR stretch
+      w2.addRow([]); w2.addRow(['Region', 'bp', 'Covered', 'Forward + reverse', 'Range']).font = {bold: true};
+      const E = R.exons, row = (name, a, b) => { if (b < a) return; let k1 = 0, k2 = 0; for (let i = a; i <= b; i++) { if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; } const L = b - a + 1; w2.addRow([name, L, `${k1} (${Math.round(k1 / L * 100)}%)`, `${k2} (${Math.round(k2 / L * 100)}%)`, cRange(a, b)]); };
+      E.forEach((e, k) => { row(`Exon ${e.n} (whole)`, e.s, e.e); if (k < E.length - 1) row(`Intron ${e.n}`, e.e + 1, E[k + 1].s - 1); });
+    }
     [16, 10, 14, 34, 14, 10, 40].forEach((w, k) => w2.getColumn(k + 1).width = w);
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
