@@ -148,6 +148,8 @@ header.top{background:var(--panel);border-bottom:1px solid var(--line);padding:6
 .cnt:empty{display:none}
 .ptab.on .cnt{background:var(--accent);color:var(--accent-ink)}
 #varState{margin:0 8px;white-space:nowrap}
+#clearReads{margin-left:4px}
+#clearReads:hover{border-color:var(--red);color:var(--red)}
 @container (max-width:640px){#sumBox{display:none}}
 .tabpane{display:none;flex:1;min-height:0;flex-direction:column}
 .tabpane.on{display:flex}
@@ -365,6 +367,7 @@ dialog p{margin:0 0 10px;font-size:12.5px}
       <span id="sumBox"></span>
       <span class="muted small" id="varState"></span>
       <button class="btn sm ghost" id="addReads" title="Browse for AB1 / FASTA files — or drop them anywhere on the page">+ Add reads</button>
+      <button class="btn sm ghost" id="clearReads" title="Remove all reads. The patient name and your classifications and notes are kept." hidden>Remove all</button>
     </div>
     <details class="flagsbar" id="flagsBar" open hidden><summary id="flagsSum"></summary><div id="flags" class="flagsbox"></div></details>
 
@@ -1555,7 +1558,7 @@ function refreshVars() { if (rafV) return; rafV = true; requestAnimationFrame(()
 
 function renderReads() {
   const el = $('#readsList');
-  $('#readCount').textContent = READS.length || '';
+  $('#readCount').textContent = READS.length || ''; $('#clearReads').hidden = !READS.length;
   { const have = !!(READS.length && R); if (have !== !!renderReads.had) setTab(have ? 'vars' : 'reads'); renderReads.had = have; }
   if (!READS.length) { el.innerHTML = ''; return; }
   el.innerHTML = READS.map(r => {
@@ -2164,6 +2167,7 @@ function bind() {
     else if (act === 'copy') { const x = r.res; if (x?.q) copyText(x.q, 'Read copied (trimmed, gene orientation)'); else copyText(r.ab ? r.ab.base : r.seq); }
     else if (act === 'fa') copyText(`>${r.name}\n${r.ab ? r.ab.base : r.seq}\n`, 'FASTA copied');
   };
+  $('#clearReads').onclick = () => { const n = READS.length; if (!n) return; READS.length = 0; SEL = null; CUR = -1; $('#tracePanel').classList.remove('on'); refresh(); toast(`Removed ${n} read${n > 1 ? 's' : ''}`); };
   $('#exportBtn').onclick = exportXlsx;
   $('#clearBtn').onclick = () => { if (READS.length && !confirm('Remove all reads, variants and classifications for this patient?')) return; READS.length = 0; UCLS.clear(); SEL = null; CUR = -1; $('#patient').value = ''; $('#sample').value = ''; $('#tracePanel').classList.remove('on'); refresh(); };
   // variant table
