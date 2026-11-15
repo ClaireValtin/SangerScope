@@ -7,142 +7,267 @@
 <meta name="description" content="Browser-based Sanger analysis: MANE reference loading, AB1/FASTA alignment, variant calling, ClinVar / gnomAD / VariantValidator annotation and Excel export.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script>try{const t=JSON.parse(localStorage.getItem('ssv-theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
 :root{
-  --bg:#eceff0;--panel:#ffffff;--panel2:#f5f7f8;--ink:#14181b;--muted:#67727a;--line:#dce1e4;
-  --head:#0f1214;--head-ink:#f2f4f5;
-  --accent:#0f9f9e;--accent-ink:#ffffff;--accent-soft:#d6f1f0;
-  --green:#1e9c5a;--green-soft:#dcf3e6;--orange:#e07f14;--orange-soft:#fcead4;
-  --red:#d03c3c;--red-soft:#fadcdc;--yellow:#b98b00;--yellow-soft:#fbf0cc;
-  --bA:#1e9c5a;--bC:#2a6fdb;--bG:#1d1f21;--bT:#d03c3c;
+  --bg:#e9ecee;--panel:#ffffff;--panel2:#f4f6f7;--ink:#15191c;--muted:#5d6870;--line:#d3d9dd;--line2:#e7eaec;
+  --accent:#0b7f86;--accent-ink:#ffffff;--accent-soft:#d9eef0;
+  --green:#197f49;--green-soft:#ddf0e5;--orange:#b55d00;--orange-soft:#fbe8d0;
+  --red:#c22f2f;--red-soft:#f9dcdc;--yellow:#876700;--yellow-soft:#f7edc4;
+  --bA:#197f49;--bC:#2563c9;--bG:#1d1f21;--bT:#c22f2f;
   --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
-  --sans:'Manrope',system-ui,-apple-system,Segoe UI,sans-serif;
-  --r:12px;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+  --r:4px;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0c0f11;--panel:#151a1d;--panel2:#1b2024;--ink:#e5e9eb;--muted:#8d979e;--line:#283035;
-  --head:#07090a;--accent:#2cc2bf;--accent-ink:#04110f;--accent-soft:#11302f;
+  --bg:#0b0e10;--panel:#14181b;--panel2:#1a1f23;--ink:#e4e8ea;--muted:#8f9aa1;--line:#2a3237;--line2:#20272b;
+  --accent:#35b9c0;--accent-ink:#04110f;--accent-soft:#12303280;
   --green:#3cc47c;--green-soft:#123122;--orange:#f39a3a;--orange-soft:#38270f;
-  --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;--bG:#d6d9db;
+  --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;
+  --bA:#3cc47c;--bC:#6aa1ff;--bG:#d6d9db;--bT:#ef6262;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
-  --bg:#0c0f11;--panel:#151a1d;--panel2:#1b2024;--ink:#e5e9eb;--muted:#8d979e;--line:#283035;
-  --head:#07090a;--accent:#2cc2bf;--accent-ink:#04110f;--accent-soft:#11302f;
+  --bg:#0b0e10;--panel:#14181b;--panel2:#1a1f23;--ink:#e4e8ea;--muted:#8f9aa1;--line:#2a3237;--line2:#20272b;
+  --accent:#35b9c0;--accent-ink:#04110f;--accent-soft:#12303280;
   --green:#3cc47c;--green-soft:#123122;--orange:#f39a3a;--orange-soft:#38270f;
-  --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;--bG:#d6d9db;
+  --red:#ef6262;--red-soft:#3b1a1a;--yellow:#e2b822;--yellow-soft:#373010;
+  --bA:#3cc47c;--bC:#6aa1ff;--bG:#d6d9db;--bT:#ef6262;
   color-scheme:dark;
 }
 :root[data-theme="light"]{color-scheme:light}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.4}
+body{display:flex;flex-direction:column;min-height:100vh}
 button,input,select,textarea{font:inherit;color:inherit}
 a{color:var(--accent)}
-header.top{background:var(--head);color:var(--head-ink);padding:12px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.2px}
-.brand small{font-weight:500;font-size:12px;color:#97a2a8;letter-spacing:0}
-header .sp{flex:1}
-.hbtn{background:#1f2629;border:1px solid #2d363a;color:#e8ecee;border-radius:8px;padding:7px 12px;cursor:pointer}
-.hbtn:hover{border-color:var(--accent)}
-main{max-width:1440px;margin:0 auto;padding:18px 16px 60px;display:grid;gap:16px}
-.grid2{display:grid;gap:16px;grid-template-columns:1fr}
-@media (min-width:1100px){.grid2{grid-template-columns:1fr 1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
-.card h2{margin:0 0 12px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px}
-.card h2 .n{background:var(--accent);color:var(--accent-ink);border-radius:6px;width:22px;height:22px;display:inline-grid;place-items:center;font-size:12px}
-.card h2 .rt{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);font-size:12px}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.inp{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
-.inp:focus{outline:2px solid var(--accent);outline-offset:-1px}
-textarea.inp{width:100%;font-family:var(--mono);font-size:12px;resize:vertical}
-.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;white-space:nowrap}
-.btn:hover{filter:brightness(1.07)}
-.btn:disabled{opacity:.45;cursor:default}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:600}
-.btn.ghost:hover{border-color:var(--accent)}
-.btn.sm{padding:4px 9px;font-size:12px}
-.btn.dark{background:var(--ink);color:var(--panel)}
+h2{margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap}
+[hidden]{display:none!important}
+.sp{flex:1}
 .muted{color:var(--muted)}
-.small{font-size:12px}
+.small{font-size:11.5px}
 .mono{font-family:var(--mono)}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-top:12px;font-size:13px}
-.kv b{color:var(--muted);font-weight:600}
-.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.bdg{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.ok{color:var(--green)}
+.bad{color:var(--red)}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* controls */
+.inp{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:0 7px;height:26px;min-width:0}
+.inp:focus,.btn:focus-visible,.chipbtn:focus-visible,.ptab:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+textarea.inp{width:100%;height:auto;padding:6px 7px;font-family:var(--mono);font-size:12px;resize:vertical}
+select.inp{padding:0 3px}
+.btn{background:var(--accent);color:var(--accent-ink);border:1px solid transparent;border-radius:var(--r);padding:0 10px;height:26px;font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{background:var(--panel);color:var(--ink);border-color:var(--line);font-weight:500}
+.btn.ghost:hover{border-color:var(--accent);filter:none}
+.btn.sm{height:22px;padding:0 7px;font-size:11.5px}
+.btn.dark{background:var(--ink);color:var(--panel)}
+.btn.ico{width:26px;padding:0;display:inline-grid;place-items:center}
+label.fld{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:var(--panel)}
+
+/* top bar */
+header.top{background:var(--panel);border-bottom:1px solid var(--line);padding:6px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;position:relative;z-index:30}
+.brand{flex:none;display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;letter-spacing:-.1px;margin-right:6px}
+.vsep{width:1px;align-self:stretch;background:var(--line);margin:1px 4px}
+#geneInput{width:100px;text-transform:uppercase;font-weight:600}
+#txSelect{flex:0 1 190px;width:190px;min-width:96px}
+#patient{flex:0 1 160px;width:160px;min-width:90px}
+#sample{flex:0 1 140px;width:140px;min-width:80px}
+.anchor{position:relative}
+.chipbtn{flex:none;height:26px;border:1px solid var(--line);background:var(--panel2);border-radius:var(--r);padding:0 8px;cursor:pointer;display:flex;gap:6px;align-items:center;max-width:300px;font-size:12px;white-space:nowrap}
+.chipbtn:hover{border-color:var(--accent)}
+.chipbtn #geneState{overflow:hidden;text-overflow:ellipsis}
+.pop{position:absolute;top:calc(100% + 6px);left:0;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:12px;width:min(600px,92vw)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px}
+.kv b{color:var(--muted);font-weight:500}
+.badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.bdg{font-size:11px;font-weight:600;border-radius:3px;padding:1px 6px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
 .bdg.ok{background:var(--green-soft);color:var(--green);border-color:transparent}
 .bdg.bad{background:var(--red-soft);color:var(--red);border-color:transparent}
 .bdg.warn{background:var(--orange-soft);color:var(--orange);border-color:transparent}
 .bdg.info{background:var(--accent-soft);color:var(--accent);border-color:transparent}
-.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:.15s;background:var(--panel2)}
-.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
-.drop strong{display:block;font-size:15px}
-details summary{cursor:pointer;font-weight:700;font-size:13px;margin:12px 0 6px}
-.reads{display:grid;gap:6px;margin-top:12px}
-.rd{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--panel2)}
-.rd.off{opacity:.5}
-.rd .dir{font-family:var(--mono);font-weight:700;font-size:12px;border-radius:6px;padding:3px 7px;min-width:44px;text-align:center}
-.dirF{background:var(--accent-soft);color:var(--accent)}
-.dirR{background:var(--orange-soft);color:var(--orange)}
-.dirX{background:var(--red-soft);color:var(--red)}
-.rd .nm{font-weight:700;word-break:break-all}
-.rd .meta{font-size:12px;color:var(--muted)}
-.rd .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
-table{border-collapse:collapse;width:100%}
-.tbl{overflow-x:auto}
-.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:700;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}
-.tbl tr.vr{cursor:pointer}
-.tbl tr.vr:hover td{background:var(--panel2)}
-.tbl tr.sel td{background:var(--accent-soft)}
-.hg{font-family:var(--mono);font-weight:700;white-space:nowrap}
-.chip{display:inline-block;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:700;white-space:nowrap}
-.c-P{background:var(--red-soft);color:var(--red)}
-.c-LP{background:var(--orange-soft);color:var(--orange)}
-.c-VUS{background:var(--yellow-soft);color:var(--yellow)}
-.c-LB{background:var(--green-soft);color:var(--green)}
-.c-B{background:var(--green-soft);color:var(--green)}
-.c-N{background:var(--panel2);color:var(--muted)}
-.flagl{display:flex;flex-wrap:wrap;gap:4px}
-.fl{font-size:11px;border-radius:5px;padding:1px 6px;background:var(--orange-soft);color:var(--orange);font-weight:700;white-space:nowrap}
-.fl.r{background:var(--red-soft);color:var(--red)}
-.fl.g{background:var(--panel2);color:var(--muted)}
-select.cls{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line)}
-input.note{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);width:150px}
-.stats{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 12px}
-.stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:120px}
-.stat .v{font-size:20px;font-weight:800;letter-spacing:-.3px}
-.stat .l{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-.ex{font-size:11px;font-weight:700;border-radius:6px;padding:3px 7px;font-family:var(--mono);cursor:pointer;border:1px solid transparent}
+#sumBox{display:flex;gap:10px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden}
+#sumBox b{color:var(--ink);font-weight:700}
+#sumBox .plp{color:var(--red)}#sumBox .plp b{color:var(--red)}
+
+/* panels */
+.phead{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);background:var(--panel2);min-height:36px;flex-wrap:wrap}
+.cov{background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+.cov .phead{flex-wrap:nowrap;overflow:hidden}
+@media (max-width:1500px){#covHint{display:none}}
+.cov.shut .cbody{display:none}
+.cov.shut .phead{border-bottom:0}
+.tgl{border:0;background:none;cursor:pointer;padding:0 2px;font-size:11px;color:var(--muted);width:16px}
+.cov.shut .tgl{transform:rotate(-90deg)}
+.stats{display:flex;gap:14px;align-items:baseline;white-space:nowrap;overflow:hidden;min-width:0}
+.stat{display:inline-flex;gap:5px;align-items:baseline}
+.stat .v{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .l{font-size:11.5px;color:var(--muted)}
+.cbody{padding:4px 10px 6px;max-height:34vh;overflow:auto}
+.svgwrap{overflow-x:auto}
+#covSvg{display:block;min-width:820px;width:100%;cursor:pointer}
+#covSvg text{font-family:var(--sans);font-size:10px;fill:var(--muted)}
+#covSvg .exn{font-weight:700;fill:var(--ink)}
+.crow{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:3px}
+.ex{font-size:10.5px;font-weight:600;border-radius:3px;padding:1px 5px;font-family:var(--mono);cursor:pointer;border:1px solid transparent}
 .ex.full{background:var(--green-soft);color:var(--green)}
 .ex.part{background:var(--orange-soft);color:var(--orange)}
 .ex.none{background:var(--red-soft);color:var(--red)}
-.ex.off{background:var(--panel2);color:var(--muted);opacity:.7}
+.ex.off{background:var(--panel2);color:var(--muted);opacity:.75}
 .ex:hover{border-color:currentColor}
-.tgt{display:grid;gap:6px;margin-top:10px}
-.tgt .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel2);cursor:pointer}
+.gaps{font-size:11.5px}
+.tgt{display:flex;flex-wrap:wrap;gap:4px}
+
+.tgt:empty{display:none}
+.tgt .t{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11.5px;border:1px solid var(--line);border-radius:var(--r);padding:0 7px;background:var(--panel2);cursor:pointer}
 .tgt .t:hover{border-color:var(--accent)}
-.svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
-#covSvg{display:block;min-width:900px;width:100%}
-#covSvg text{font-family:var(--sans);font-size:10px;fill:var(--muted)}
-#covSvg .exn{font-weight:700;fill:var(--ink)}
-.gaps{font-size:12px;margin-top:8px}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.toolbar label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
-.status{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:30px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#aln{max-height:72vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px 0;background:var(--panel)}
-.blk{padding:4px 0 10px;border-bottom:1px dashed var(--line)}
+
+/* workspace */
+.work{display:grid;grid-template-columns:var(--split,46%) 5px minmax(0,1fr);grid-template-rows:minmax(0,1fr);flex:1;min-height:0}
+.pane{background:var(--panel);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+#paneL{container-type:inline-size}
+.split{cursor:col-resize;background:var(--line);touch-action:none}
+.split:hover,.split.drag{background:var(--accent)}
+@media (min-width:1000px) and (min-height:540px){body{height:100vh;overflow:hidden}header.top{flex-wrap:nowrap}}
+@media not ((min-width:1000px) and (min-height:540px)){
+  .work{display:block}.split{display:none}
+  .pane{height:78vh;border-bottom:6px solid var(--bg)}
+  .cov .phead{flex-wrap:wrap}
+}
+
+/* left pane tabs */
+.ptabs{padding:0 10px 0 4px;gap:0;flex-wrap:nowrap}
+.ptab{border:0;background:none;height:35px;padding:0 10px;cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;gap:6px;align-items:center;white-space:nowrap}
+.ptab:hover{color:var(--ink)}
+.ptab.on{color:var(--ink);border-bottom-color:var(--accent)}
+.cnt{font-size:10.5px;background:var(--line2);border-radius:8px;padding:0 6px;min-width:18px;text-align:center;letter-spacing:0}
+.cnt:empty{display:none}
+.ptab.on .cnt{background:var(--accent);color:var(--accent-ink)}
+#varState{margin:0 8px;white-space:nowrap}
+@container (max-width:640px){#sumBox{display:none}}
+.tabpane{display:none;flex:1;min-height:0;flex-direction:column}
+.tabpane.on{display:flex}
+.tabpane.pad{padding:10px;overflow:auto}
+
+/* alerts */
+.flagsbar{border-bottom:1px solid var(--line);background:var(--orange-soft);flex:none}
+.flagsbar.r{background:var(--red-soft)}
+.flagsbar summary{cursor:pointer;padding:4px 10px;font-size:12px;color:var(--orange)}
+.flagsbar.r summary{color:var(--red)}
+.flagsbox{display:grid;gap:3px;padding:0 10px 7px;max-height:124px;overflow:auto}
+.fb{font-size:12px;border-left:3px solid var(--orange);padding:3px 8px;background:var(--panel);border-radius:0 3px 3px 0}
+.fb.r{border-color:var(--red)}
+.fb.i{border-color:var(--accent)}
+
+/* variants list */
+table{border-collapse:collapse;width:100%}
+#varWrap{flex:0 1 auto;max-height:46%;overflow:auto;border-bottom:1px solid var(--line)}
+.tbl th{position:sticky;top:0;z-index:2;background:var(--panel);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:5px 6px;box-shadow:inset 0 -1px 0 var(--line);white-space:nowrap}
+.tbl td{padding:4px 6px;border-bottom:1px solid var(--line2);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;height:29px}
+.tbl tr.vr{cursor:pointer}
+.tbl tr.vr:hover td{background:var(--panel2)}
+.tbl tr.sel td{background:var(--accent-soft)!important}
+.tbl tr.art td{opacity:.55}
+.tbl tr.art .hg{text-decoration:line-through}
+.tbl td.c-hg{max-width:190px;padding-left:10px}
+.tbl td.c-cv{max-width:160px}
+.tbl th:first-child{padding-left:10px}
+@container (max-width:730px){.c-rd{display:none}}
+@container (max-width:630px){.c-loc{display:none}}
+.hg{font-family:var(--mono);font-weight:700;font-size:12px}
+.pr{font-family:var(--mono);font-size:12px}
+.nv{font-weight:700;margin-left:5px;font-size:11px}
+.nv-ok{color:var(--green)}.nv-fix,.nv-off{color:var(--orange)}.nv-bad{color:var(--red)}
+.stars{color:var(--yellow);font-size:10px;margin-left:3px;letter-spacing:-1px}
+.chip{display:inline-block;border-radius:3px;padding:0 5px;font-size:11.5px;font-weight:600;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.c-P{background:var(--red-soft);color:var(--red)}
+.c-LP{background:var(--orange-soft);color:var(--orange)}
+.c-VUS{background:var(--yellow-soft);color:var(--yellow)}
+.c-LB,.c-B{background:var(--green-soft);color:var(--green)}
+.c-N{background:var(--panel2);color:var(--muted)}
+.flagl{display:flex;flex-wrap:wrap;gap:3px}
+.fl{font-size:11px;border-radius:3px;padding:0 5px;background:var(--orange-soft);color:var(--orange);font-weight:600;white-space:nowrap}
+.fl.r{background:var(--red-soft);color:var(--red)}
+.fl.g{background:var(--panel2);color:var(--muted)}
+.empty{color:var(--muted);font-size:12.5px;padding:18px;text-align:center}
+#varEmpty{margin:auto}
+
+/* variant detail */
+.vdetail{flex:1;min-height:0;overflow:auto}
+.vd-hint{padding:16px 12px;color:var(--muted);font-size:12.5px;line-height:1.9}
+.vd-head{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:var(--panel);z-index:1;flex-wrap:wrap}
+.vd-head .hg{font-size:13.5px}
+.vd-head .tx{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.vd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:var(--line2)}
+.vd-sec{background:var(--panel);padding:7px 10px 9px;min-width:0;font-size:12.5px}
+.vd-sec.wide{grid-column:1/-1}
+.vd-sec h4{margin:0 0 5px;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.vd-sec .kv{font-size:12.5px}
+.vd-sec .kv>span{min-width:0;overflow-wrap:anywhere}
+.vd-sec .fl{white-space:normal;font-weight:500;padding:1px 6px}
+select.cls{height:26px;padding:0 3px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);width:100%;margin-top:6px}
+input.note{height:26px;padding:0 7px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);width:100%;margin-top:5px}
+.annot a{font-weight:600}
+.vvn{font-size:11px;color:var(--muted);font-family:var(--mono);overflow-wrap:anywhere}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sc{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;border-radius:3px;padding:0 5px;margin:2px 3px 0 0;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.sc-hi{background:var(--red-soft);color:var(--red);border-color:transparent}
+.sc-mid{background:var(--yellow-soft);color:var(--yellow);border-color:transparent}
+.sc-lo{background:var(--green-soft);color:var(--green);border-color:transparent}
+.scs{margin-top:2px}
+.sep{border-top:1px dashed var(--line);margin:6px 0 5px}
+.mdd summary{font-size:11px;margin:4px 0 0;color:var(--accent);cursor:pointer}
+.mdd table{font-size:11px;margin-top:4px}
+.mdd th{text-align:left;padding:4px 4px 1px;font-size:10px;text-transform:uppercase;color:var(--muted);border:0;position:static;box-shadow:none}
+.mdd td{padding:1px 4px;border:0;font-size:11px;height:auto;max-width:none;white-space:normal}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* reads tab */
+.drop{border:1px dashed var(--muted);border-radius:6px;padding:16px;text-align:center;cursor:pointer;transition:.15s;background:var(--panel2)}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{display:block;font-size:13.5px}
+details>summary{cursor:pointer}
+.tabpane details>summary{font-weight:600;font-size:12.5px;margin:10px 0 6px}
+.reads{display:grid;gap:4px;margin-top:10px}
+.rd{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:var(--r);padding:5px 8px}
+.rd.off{opacity:.5}
+.dir{font-family:var(--mono);font-weight:700;font-size:11px;border-radius:3px;padding:1px 5px;min-width:36px;text-align:center;display:inline-block}
+.dirF{background:var(--accent-soft);color:var(--accent)}
+.dirR{background:var(--orange-soft);color:var(--orange)}
+.dirX{background:var(--red-soft);color:var(--red)}
+.rd .nm{font-weight:600;word-break:break-all}
+.rd .meta{font-size:11.5px;color:var(--muted)}
+.rd .acts{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
+.hint{font-size:11.5px;color:var(--muted);margin:6px 0 0}
+
+/* reference tab */
+.tabs{display:flex;gap:3px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);height:24px;padding:0 9px;cursor:pointer;font-weight:600;font-size:11.5px}
+.tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.seqbox{font-family:var(--mono);font-size:12px;line-height:1.55;word-break:break-all;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:8px}
+#refBox{flex:1;min-height:120px}
+.seqbox .ex{all:unset;color:var(--accent);font-weight:700}
+.seqbox .in{color:var(--muted)}
+.seqbox .alt{color:var(--ink);font-weight:700}
+
+/* alignment */
+.status{font-family:var(--mono);font-size:11.5px;background:var(--panel);border-bottom:1px solid var(--line);padding:5px 10px;min-height:27px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+#aln{flex:1 0 132px;min-height:132px;overflow:auto;padding:4px 0}
+.blk{padding:4px 0 8px;border-bottom:1px dashed var(--line)}
 .blk:last-child{border-bottom:0}
 .ln{display:flex;white-space:pre;font-family:var(--mono);font-size:12.5px;line-height:1.5}
-.ln .lab{width:118px;flex:none;padding:0 8px 0 12px;color:var(--muted);user-select:none;-webkit-user-select:none;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+.ln .lab{width:104px;flex:none;padding:0 8px 0 10px;color:var(--muted);user-select:none;-webkit-user-select:none;overflow:hidden;text-overflow:ellipsis;font-size:11px;line-height:18.75px;position:sticky;left:0;background:var(--panel);z-index:1}
 .ln .sq{cursor:crosshair}
-.ln .end{color:var(--muted);user-select:none;-webkit-user-select:none;padding-left:10px;font-size:11px}
-.ln.ru .sq,.ln.aa .sq{color:var(--muted)}
+.ln .end{color:var(--muted);user-select:none;-webkit-user-select:none;padding-left:8px;font-size:10.5px;line-height:18.75px}
+.ln.ru .sq{color:var(--muted)}
 .ln.aa .sq{color:var(--accent);font-weight:700}
 .ln.ref .lab{color:var(--ink);font-weight:700}
-.rgap{padding:6px 12px;color:var(--muted);font-size:12px;font-style:italic;user-select:none}
+.rgap{padding:5px 10px;color:var(--muted);font-size:11.5px;font-style:italic;user-select:none}
 .k-cds{color:var(--ink);font-weight:700}
 .k-utr{color:var(--accent)}
 .k-in{color:var(--muted)}
@@ -155,170 +280,165 @@ input.note{font-size:12px;padding:4px 6px;border-radius:6px;background:var(--pan
 .s-n{color:var(--muted)}
 .s-mix{background:var(--orange-soft)}
 .s-lowq{text-decoration:underline dotted var(--muted)}
-.tracepanel{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--panel2);display:none}
-.tracepanel.on{display:block}
-.tracepanel .tr{margin:6px 0 10px}
-.tracepanel .tr .h{font-size:12px;font-weight:700;display:flex;gap:10px;flex-wrap:wrap}
-.tracepanel canvas{width:100%;height:150px;display:block;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-top:4px}
-.tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
-.tab{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:5px 11px;cursor:pointer;font-weight:700;font-size:12px}
-.tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
-.seqbox{font-family:var(--mono);font-size:12px;line-height:1.55;word-break:break-all;max-height:320px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}
-.seqbox .ex{all:unset;color:var(--accent);font-weight:700}
-.seqbox .in{color:var(--muted)}
-.seqbox .alt{color:var(--ink);font-weight:700}
-.flagsbox{display:grid;gap:5px;margin-top:10px}
-.fb{font-size:12.5px;border-left:3px solid var(--orange);padding:5px 10px;background:var(--orange-soft);border-radius:0 7px 7px 0}
-.fb.r{border-color:var(--red);background:var(--red-soft)}
-.fb.i{border-color:var(--accent);background:var(--accent-soft)}
-.empty{color:var(--muted);font-size:13px;padding:14px;text-align:center;border:1px dashed var(--line);border-radius:10px}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
-@keyframes sp{to{transform:rotate(360deg)}}
-#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:9px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}
-#toast.on{opacity:1}
-dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:20px;width:min(520px,94vw)}
-dialog::backdrop{background:rgba(0,0,0,.45)}
-dialog h3{margin:0 0 12px}
-.set{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;font-size:13px}
-.set small{display:block;color:var(--muted);font-size:11.5px}
-footer{max-width:1440px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
-.pt td{font-size:12.5px}
-.hint{font-size:12px;color:var(--muted);margin-top:6px}
-.annot{font-size:12px}
-.tbl td.c-cv,.tbl td.c-gb{min-width:150px;max-width:230px}
-.tbl td.c-rv{min-width:150px}
-.tbl td.c-rv select.cls{width:100%;margin-top:5px}
-.tbl td.c-rv input.note{width:100%;margin-top:4px;box-sizing:border-box}
-.pr{font-family:var(--mono);font-size:12px;white-space:nowrap;margin-top:1px}
-.zr{margin-top:5px;font-size:12px}
-.sep{border-top:1px dashed var(--line);margin:6px 0 5px}
-.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.annot a{font-weight:700}
-.vvn{font-size:11px;color:var(--muted);font-family:var(--mono)}
-.sc{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;margin:2px 3px 0 0;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
-.sc-hi{background:var(--red-soft);color:var(--red);border-color:transparent}
-.sc-mid{background:var(--yellow-soft);color:var(--yellow);border-color:transparent}
-.sc-lo{background:var(--green-soft);color:var(--green);border-color:transparent}
-.scs{margin-top:2px;max-width:220px}
-.mdd summary{font-size:11px;margin:4px 0 0;color:var(--accent)}
-.mdd table{font-size:11px;margin-top:4px;min-width:230px}
-.mdd th{text-align:left;padding:4px 4px 1px;font-size:10px;text-transform:uppercase;color:var(--muted);border:0}
-.mdd td{padding:1px 4px;border:0;font-size:11px}
+.pop.right{left:auto;right:0;width:290px}
+.legend{display:grid;gap:5px;font-size:12px}
+.legend i{font-family:var(--mono);font-style:normal;font-size:12px;padding:0 3px;margin-right:8px;display:inline-block;min-width:38px;text-align:center}
 
+/* traces (docked under the alignment) */
+.tracepanel{display:none;flex:0 1 auto;max-height:56%;border-top:2px solid var(--accent);background:var(--panel);flex-direction:column;min-height:0}
+.tracepanel.on{display:flex}
+.trhead{display:flex;gap:8px;align-items:center;padding:4px 10px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.trhead .pos{font-family:var(--mono);font-weight:700;font-size:12.5px}
+.trleg{display:flex;gap:7px;font-family:var(--mono);font-weight:700;font-size:12px}
+.trbody{overflow:auto;padding:2px 10px 8px}
+.tr{margin-top:6px}
+.tr .h{font-size:11.5px;display:flex;gap:8px;align-items:center;white-space:nowrap;overflow:hidden}
+.tr .h .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.tr .h .inf{font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.tracepanel canvas{width:100%;height:94px;display:block;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-top:3px}
+@media (max-height:780px){.tracepanel canvas{height:80px}}
+
+/* overlays */
+body.dragging::after{content:'Drop AB1 / FASTA files to add reads';position:fixed;inset:8px;z-index:60;display:grid;place-items:center;font-size:20px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--panel) 88%,transparent);border:2px dashed var(--accent);border-radius:10px;pointer-events:none}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:5px;font-weight:500;opacity:0;pointer-events:none;transition:.2s;z-index:70;max-width:90vw}
+#toast.on{opacity:1}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);padding:18px;width:min(540px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 12px;font-size:15px}
+dialog p{margin:0 0 10px;font-size:12.5px}
+.set{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;font-size:12.5px}
+.set small{display:block;color:var(--muted);font-size:11.5px}
 </style>
 </head>
 <body>
 <header class="top">
   <div class="brand">
-    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="7" fill="#0f9f9e"/><path d="M3 18 Q6 4 9 18 T15 18 Q18 8 21 18 T25 16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
-    <div>SangerScope<br><small>Sanger variant analysis · runs entirely in your browser</small></div>
+    <svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="5" fill="#0b7f86"/><path d="M3 18 Q6 4 9 18 T15 18 Q18 8 21 18 T25 16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    SangerScope
   </div>
+  <input id="geneInput" class="inp" placeholder="Gene, e.g. VHL" autocomplete="off" spellcheck="false" aria-label="Gene symbol">
+  <button class="btn" id="loadGene">Load</button>
+  <select id="txSelect" class="inp" disabled aria-label="Transcript"><option>Transcript</option></select>
+  <div class="anchor">
+    <button class="chipbtn" id="geneChip" data-pop="genePop" title="Reference details and integrity checks"><span id="geneState" class="muted">No gene loaded</span><span class="muted">▾</span></button>
+    <div class="pop" id="genePop" hidden>
+      <div id="geneInfo"><span class="muted">Load a gene to see its transcript, locus and the reference integrity checks.</span></div>
+      <div id="gates" class="badges"></div>
+    </div>
+  </div>
+  <div class="vsep"></div>
+  <input id="patient" class="inp" placeholder="Patient name" aria-label="Patient name">
+  <input id="sample" class="inp" placeholder="Dossier / sample ID" aria-label="Dossier or sample ID">
   <div class="sp"></div>
-  <button class="hbtn" id="themeBtn" title="Switch between automatic, light and dark theme">Theme: auto</button>
-  <button class="hbtn" id="setBtn">Settings</button>
+  <button class="btn dark" id="exportBtn">Export Excel</button>
+  <button class="btn ghost" id="clearBtn" title="Remove all reads, variants and classifications and start a new patient">New patient</button>
+  <div class="vsep"></div>
+  <button class="btn ghost" id="themeBtn" title="Switch between automatic, light and dark theme">Auto</button>
+  <button class="btn ghost" id="setBtn">Settings</button>
+  <button class="btn ghost ico" id="aboutBtn" title="About, data sources and privacy" aria-label="About">?</button>
 </header>
 
-<main>
-  <div class="grid2">
-    <section class="card">
-      <h2><span class="n">1</span>Gene &amp; reference<span class="rt" id="geneState"></span></h2>
-      <div class="row">
-        <input id="geneInput" class="inp" placeholder="Gene symbol, e.g. VHL" style="flex:1;min-width:140px;text-transform:uppercase" autocomplete="off" spellcheck="false">
-        <button class="btn" id="loadGene">Load gene</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <select id="txSelect" class="inp" style="flex:1" disabled><option>Transcript</option></select>
-      </div>
-      <div id="geneInfo"></div>
-      <div id="gates" class="badges"></div>
-    </section>
-
-    <section class="card">
-      <h2><span class="n">2</span>Patient &amp; export</h2>
-      <div class="row">
-        <input id="patient" class="inp" placeholder="Patient name" style="flex:2;min-width:180px">
-        <input id="sample" class="inp" placeholder="Dossier / sample ID (optional)" style="flex:1;min-width:150px">
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn dark" id="exportBtn">Export Excel</button>
-        <button class="btn ghost" id="clearBtn">New patient (clear reads)</button>
-      </div>
-      <p class="hint">Reads, traces and the patient name never leave this browser. Only variant descriptions (e.g. <span class="mono">NM_000551.4:c.191G&gt;C</span>) and genomic coordinates are sent to VariantValidator, NCBI ClinVar, GeneBe, gnomAD and MobiDetails.</p>
-      <div id="sumBox" class="stats" style="margin:6px 0 0"></div>
-    </section>
-  </div>
-
-  <section class="card">
-    <h2><span class="n">3</span>Reads<span class="rt" id="readCount"></span></h2>
-    <div class="drop" id="drop">
-      <strong>Drop AB1 / FASTA files here</strong>
-      <span class="muted small">or click to browse · .ab1 .abi .fasta .fa .fas .seq .txt · several at once</span>
-      <input type="file" id="fileInput" multiple hidden accept=".ab1,.abi,.ab,.fasta,.fa,.fas,.fna,.seq,.txt">
-    </div>
-    <details id="pasteDet">
-      <summary>Paste a sequence or FASTA</summary>
-      <input id="pasteName" class="inp" placeholder="Read name (used if no &gt;header), e.g. 2F" style="width:100%;margin-bottom:6px">
-      <textarea id="pasteBox" class="inp" rows="5" placeholder="&gt;1F&#10;ACGTRYKM... (IUPAC codes = heterozygous)"></textarea>
-      <div class="row" style="margin-top:6px"><button class="btn sm" id="pasteAdd">Add sequence</button><span class="muted small">Multi-FASTA allowed. R, Y, S, W, K, M are read as heterozygous.</span></div>
-    </details>
-    <div class="reads" id="readsList"></div>
-  </section>
-
-  <section class="card">
-    <h2><span class="n">4</span>Coverage<span class="rt">click the map to jump the alignment there</span></h2>
-    <div class="toolbar">
-      <label>Target <select id="covScope" class="inp"><option value="auto">Exons with reads</option><option value="cds">Whole CDS</option><option value="gene">Whole gene (exons + introns + UTRs)</option><option value="exons">Chosen exons</option></select></label>
-      <input id="covExons" class="inp mono" placeholder="exons, e.g. 3, 5-7" style="width:170px;display:none">
-      <input id="covPos" class="inp mono" placeholder="Key positions, e.g. 1799T&gt;A, 340+5" style="flex:1;min-width:220px" title="Positions you must see (familial variant, hotspot…). Each one gets a covered / genotype check. Saved per gene.">
-    </div>
+<section class="cov" id="covPanel">
+  <div class="phead">
+    <button class="tgl" id="covToggle" aria-expanded="true" title="Collapse or expand the coverage map">▼</button>
+    <h2>Coverage</h2>
     <div class="stats" id="covStats"></div>
+    <span class="muted small" id="covHint" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">click the map to jump the alignment there</span>
+    <div class="sp"></div>
+    <label class="fld">Target <select id="covScope" class="inp"><option value="auto">Exons with reads</option><option value="cds">Whole CDS</option><option value="gene">Whole gene (exons + introns + UTRs)</option><option value="exons">Chosen exons</option></select></label>
+    <input id="covExons" class="inp mono" placeholder="exons, e.g. 3, 5-7" style="width:150px;display:none">
+    <input id="covPos" class="inp mono" placeholder="Key positions, e.g. 1799T&gt;A, 340+5" style="width:250px;flex:0 1 250px" title="Positions you must see (familial variant, hotspot…). Each one gets a covered / genotype check. Saved per gene.">
+  </div>
+  <div class="cbody">
     <div class="svgwrap"><svg id="covSvg" viewBox="0 0 1200 120" preserveAspectRatio="xMinYMin meet"></svg></div>
-    <div class="chips" id="exonChips"></div>
-    <div class="gaps" id="covGaps"></div>
-    <div class="tgt" id="covTargets"></div>
-  </section>
+    <div class="crow"><div class="chips" id="exonChips"></div><div class="gaps" id="covGaps"></div><div class="tgt" id="covTargets"></div></div>
+  </div>
+</section>
 
-  <section class="card">
-    <h2><span class="n">5</span>Variants<span class="rt" id="varState"></span></h2>
-    <div class="tbl"><table id="varTable"><thead><tr><th>Variant</th><th>Location · reads</th><th>ClinVar</th><th>GeneBe</th><th>gnomAD v4 · scores</th><th>Review</th></tr></thead><tbody></tbody></table></div>
-    <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
-    <div id="flags" class="flagsbox"></div>
-  </section>
-
-  <section class="card">
-    <h2><span class="n">6</span>Alignment<span class="rt">select &amp; copy works on the sequence lines · click an AB1 base to open its traces</span></h2>
-    <div class="toolbar">
-      <label>Show <select id="viewMode" class="inp"><option value="reads">Read-covered regions</option><option value="exons">Coding exons ± 30 bp</option><option value="all">Whole gene</option></select></label>
-      <label>Width <select id="blockW" class="inp"><option>60</option><option>80</option><option selected>100</option><option>120</option><option>150</option></select></label>
-      <label><input type="checkbox" id="dotsChk"> dots for matches</label>
-      <input id="jumpInput" class="inp" placeholder="Go to c. (e.g. 191 or 340+5)" style="width:200px">
-      <button class="btn sm ghost" id="jumpBtn">Go</button>
+<div class="work" id="work">
+  <section class="pane" id="paneL">
+    <div class="phead ptabs">
+      <button class="ptab" data-ptab="vars">Variants <span class="cnt" id="nVars"></span></button>
+      <button class="ptab on" data-ptab="reads">Reads <span class="cnt" id="readCount"></span></button>
+      <button class="ptab" data-ptab="ref">Reference</button>
+      <span class="sp"></span>
+      <span id="sumBox"></span>
+      <span class="muted small" id="varState"></span>
+      <button class="btn sm ghost" id="addReads" title="Browse for AB1 / FASTA files — or drop them anywhere on the page">+ Add reads</button>
     </div>
-    <div class="tracepanel" id="tracePanel"></div>
-    <div class="status" id="status">Hover the alignment for coordinates.</div>
-    <div id="aln"><div class="empty" style="margin:8px">The alignment appears here as soon as a gene and a read are loaded.</div></div>
+    <details class="flagsbar" id="flagsBar" open hidden><summary id="flagsSum"></summary><div id="flags" class="flagsbox"></div></details>
+
+    <div class="tabpane" data-pane="vars" id="tabVars">
+      <div class="tbl" id="varWrap" style="display:none"><table id="varTable"><thead><tr><th>Variant</th><th>Protein</th><th>Zyg</th><th class="c-loc">Location</th><th class="c-rd">Reads</th><th>ClinVar</th><th>gnomAD</th><th>Flags</th><th>Class</th></tr></thead><tbody></tbody></table></div>
+      <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
+      <div id="varDetail" class="vdetail"></div>
+    </div>
+
+    <div class="tabpane pad on" data-pane="reads">
+      <div class="drop" id="drop">
+        <strong>Drop AB1 / FASTA files here</strong>
+        <span class="muted small">or click to browse · .ab1 .abi .fasta .fa .fas .seq .txt · several at once</span>
+        <input type="file" id="fileInput" multiple hidden accept=".ab1,.abi,.ab,.fasta,.fa,.fas,.fna,.seq,.txt">
+      </div>
+      <details id="pasteDet">
+        <summary>Paste a sequence or FASTA</summary>
+        <input id="pasteName" class="inp" placeholder="Read name (used if no &gt;header), e.g. 2F" style="width:100%;margin-bottom:5px">
+        <textarea id="pasteBox" class="inp" rows="5" placeholder="&gt;1F&#10;ACGTRYKM... (IUPAC codes = heterozygous)"></textarea>
+        <div class="row" style="margin-top:5px"><button class="btn sm" id="pasteAdd">Add sequence</button><span class="muted small">Multi-FASTA allowed. R, Y, S, W, K, M are read as heterozygous.</span></div>
+      </details>
+      <div class="reads" id="readsList"></div>
+    </div>
+
+    <div class="tabpane pad" data-pane="ref">
+      <div class="row" style="margin-bottom:6px"><div class="tabs" id="refTabs"></div><span class="sp"></span><button class="btn sm" id="refCopy">Copy</button><button class="btn sm ghost" id="refCopyFa">Copy as FASTA</button></div>
+      <div class="muted small" id="refNote" style="margin-bottom:5px"></div>
+      <div class="seqbox" id="refBox"><span class="muted">Load a gene to see its sequences.</span></div>
+      <details>
+        <summary>Extract a region by c. coordinates</summary>
+        <div class="row">
+          <input id="regFrom" class="inp mono" placeholder="from, e.g. 191-20" style="width:140px">
+          <input id="regTo" class="inp mono" placeholder="to, e.g. 340+50" style="width:140px">
+          <button class="btn sm" id="regBtn">Extract</button>
+          <button class="btn sm ghost" id="regCopy">Copy</button>
+        </div>
+        <div class="seqbox" id="regOut" style="margin-top:5px;max-height:140px"></div>
+      </details>
+    </div>
   </section>
 
-  <section class="card">
-    <h2><span class="n">7</span>Reference sequences</h2>
-    <div class="tabs" id="refTabs"></div>
-    <div class="row" style="margin-bottom:8px"><button class="btn sm" id="refCopy">Copy</button><button class="btn sm ghost" id="refCopyFa">Copy as FASTA</button><span class="muted small" id="refNote"></span></div>
-    <div class="seqbox" id="refBox"><span class="muted">Load a gene to see its sequences.</span></div>
-    <details>
-      <summary>Extract a region by c. coordinates</summary>
-      <div class="row">
-        <input id="regFrom" class="inp mono" placeholder="from, e.g. 191-20">
-        <input id="regTo" class="inp mono" placeholder="to, e.g. 340+50">
-        <button class="btn sm" id="regBtn">Extract</button>
-        <button class="btn sm ghost" id="regCopy">Copy</button>
-      </div>
-      <div class="seqbox" id="regOut" style="margin-top:6px;max-height:160px"></div>
-    </details>
+  <div class="split" id="split" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
+
+  <section class="pane" id="paneR">
+    <div class="phead">
+      <h2>Alignment</h2>
+      <span class="sp"></span>
+      <label class="fld">Show <select id="viewMode" class="inp"><option value="reads">Read-covered regions</option><option value="exons">Coding exons ± 30 bp</option><option value="all">Whole gene</option></select></label>
+      <label class="fld">Width <select id="blockW" class="inp"><option value="auto">Fit</option><option>60</option><option>80</option><option>100</option><option>120</option><option>150</option></select></label>
+      <label class="fld" title="Show a dot where a read matches the reference"><input type="checkbox" id="dotsChk"> dots</label>
+      <input id="jumpInput" class="inp mono" placeholder="Go to c. 191, 340+5" style="width:150px" aria-label="Go to c. position">
+      <button class="btn sm ghost" id="jumpBtn" style="height:26px">Go</button>
+      <div class="anchor"><button class="btn ghost" data-pop="legPop" title="What the colours in the alignment mean">Legend</button>
+        <div class="pop right legend" id="legPop" hidden>
+          <span><i class="s-mm">A</i>differs from the reference</span><span><i class="s-het">R</i>heterozygous (IUPAC code)</span><span><i class="s-gap">-</i>deleted base</span><span><i class="s-ins">A</i>insertion just before this base</span><span><i class="s-lowq">A</i>base quality below Q20</span><span><i class="s-mix">A</i>mixed / overlapping trace</span><span><i class="k-v">A</i>called variant (reference line)</span><span><i class="k-cur">A</i>selected position</span><span><i class="k-cds">ACGT</i>coding exon</span><span><i class="k-utr">ACGT</i>UTR</span><span><i class="k-in">acgt</i>intron / flank</span>
+          <span class="muted">Select and copy works on the sequence lines. Click an AB1 base to open its traces.</span>
+        </div></div>
+    </div>
+    <div class="status" id="status">Hover the alignment for coordinates · click an AB1 base to open its traces.</div>
+    <div id="aln"><div class="empty">The alignment appears here as soon as a gene and a read are loaded.</div></div>
+    <div class="tracepanel" id="tracePanel"></div>
   </section>
-</main>
-<footer>
-  References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, GeneBe, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more). Heterozygous SNVs are called from secondary-peak ratios; heterozygous deletions, insertions and duplications (up to 30 bp) are called by deconvolving the two-allele trace against the reference. Every call is checked against VariantValidator and must be confirmed on the trace. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out). For laboratory use with expert review.
-</footer>
+</div>
+
+<dialog id="aboutDlg">
+  <h3>About SangerScope</h3>
+  <p><b>Privacy.</b> Reads, traces and the patient name never leave this browser. Only variant descriptions (e.g. <span class="mono">NM_000551.4:c.191G&gt;C</span>) and genomic coordinates are sent to VariantValidator, NCBI ClinVar, GeneBe, gnomAD and MobiDetails.</p>
+  <p><b>Sources.</b> References: NCBI Datasets / E-utilities (GRCh38, RefSeq, MANE). Annotation: VariantValidator, NCBI ClinVar, GeneBe, gnomAD v4, MobiDetails (REVEL, AlphaMissense, CADD, SpliceAI and more).</p>
+  <p><b>Calling.</b> Heterozygous SNVs are called from secondary-peak ratios; heterozygous deletions, insertions and duplications (up to 30 bp) are called by deconvolving the two-allele trace against the reference. Every call is checked against VariantValidator and must be confirmed on the trace. Sanger cannot distinguish homozygosity from hemizygosity over a deletion (allele drop-out).</p>
+  <p><b>Coverage map.</b> Depth strip: green = forward + reverse, orange = one direction only, red = target not covered. ▼ marks a variant (coloured by your classification), a dashed line marks a key position. Click anywhere on the map, an exon chip or a read to jump the alignment there.</p>
+  <p><b>Keyboard.</b> <span class="kbd">↑</span> <span class="kbd">↓</span> previous / next variant · <span class="kbd">←</span> <span class="kbd">→</span> step the trace one base · <span class="kbd">Esc</span> close the traces.</p>
+  <p class="muted">For laboratory use with expert review.</p>
+  <div class="row" style="justify-content:flex-end"><button class="btn" id="aboutClose">Close</button></div>
+</dialog>
 
 <dialog id="settingsDlg">
   <h3>Settings</h3>
@@ -376,6 +496,8 @@ function translate(s) { let p = ''; for (let i = 0; i + 2 < s.length; i += 3) p 
 const DEF = {het: 0.30, trim: true, trimQ: 20, edge: 10, auto: true, ncbiKey: '', mdKey: '', gbUser: '', gbKey: '', gbRelay: '', width: 100, dots: false, view: 'reads'};
 const ST = Object.assign({}, DEF, recall('ssv-settings') || {});
 const saveSettings = () => store('ssv-settings', ST);
+const UI = Object.assign({width: 'auto', split: 0.46, cov: true, trw: 10}, recall('ssv-ui2') || {});
+const saveUI = () => store('ssv-ui2', UI);
 
 let R = null;          // loaded reference
 let PROD = null;       // NCBI product report for the gene
@@ -441,7 +563,7 @@ async function loadGene(symbol) {
     const sel = $('#txSelect'); sel.disabled = false;
     sel.innerHTML = txs.map((t, i) => `<option value="${i}">${esc(t.accession_version)}${t.select_category === 'MANE_SELECT' ? ' — MANE Select' : t.select_category ? ' — ' + esc(t.select_category.replace(/_/g, ' ')) : ''}${t.name ? ' · ' + esc(t.name) : ''}</option>`).join('');
     await loadTranscript(0);
-  } catch (e) { setGeneState(''); toast(e.message, 5000); $('#geneInfo').innerHTML = `<div class="fb r" style="margin-top:10px">${esc(e.message)}</div>`; }
+  } catch (e) { setGeneState('<span class="bad">✗ gene not loaded</span>'); toast(e.message, 5000); $('#geneInfo').innerHTML = `<div class="bad">${esc(e.message)}</div>`; $('#gates').innerHTML = ''; $('#genePop').hidden = false; }
 }
 
 async function loadTranscript(i) {
@@ -490,7 +612,7 @@ async function loadTranscript(i) {
   R.gates = validateRef(assembled);
   IDX = buildIndex(seq);
   renderGene();
-  setGeneState(`${esc(symbol)} ready`);
+  { const nb = R.gates.filter(g => !g.ok).length; setGeneState(`chr${esc(R.chr)} · ${R.exons.length} exon${R.exons.length > 1 ? 's' : ''} · ${nb ? `<span class="bad">✗ ${nb} check${nb > 1 ? 's' : ''} failed</span>` : `<span class="ok">✓ ${R.gates.length} checks</span>`}`); }
   loadScope();
   ANN.clear();
   READS.forEach(processRead);
@@ -512,7 +634,7 @@ function validateRef(assembled) {
   return g;
 }
 
-function setGeneState(h) { $('#geneState').innerHTML = h; }
+function setGeneState(h) { const el = $('#geneState'); el.innerHTML = h; el.classList.toggle('muted', !h); if (!h) el.textContent = 'No gene loaded'; }
 function renderGene() {
   const nc = R.exons.filter(e => R.mpos[e.s] <= R.cdsE && R.mpos[e.e] >= R.cdsS).length;
   $('#geneInfo').innerHTML = `<div class="kv">
@@ -1433,7 +1555,8 @@ function refreshVars() { if (rafV) return; rafV = true; requestAnimationFrame(()
 
 function renderReads() {
   const el = $('#readsList');
-  $('#readCount').textContent = READS.length ? `${READS.length} read${READS.length > 1 ? 's' : ''}` : '';
+  $('#readCount').textContent = READS.length || '';
+  { const have = !!(READS.length && R); if (have !== !!renderReads.had) setTab(have ? 'vars' : 'reads'); renderReads.had = have; }
   if (!READS.length) { el.innerHTML = ''; return; }
   el.innerHTML = READS.map(r => {
     const x = r.res; let dir = '…', cls = 'dirX', meta = [];
@@ -1526,8 +1649,8 @@ function keyPosText(k) {
 }
 function renderCoverage() {
   const svg = $('#covSvg');
-  if (!R) { svg.setAttribute('viewBox', '0 0 1200 40'); svg.innerHTML = `<text x="16" y="24">Load a gene to see the coverage map.</text>`; $('#covStats').innerHTML = ''; $('#exonChips').innerHTML = ''; $('#covGaps').innerHTML = ''; $('#covTargets').innerHTML = ''; return; }
-  const W = 1200, PADX = 10, IW = W - 2 * PADX;
+  if (!R) { svg.setAttribute('viewBox', '0 0 1200 30'); svg.innerHTML = `<text x="10" y="19" style="font-size:11px">Load a gene to see the coverage map.</text>`; $('#covStats').innerHTML = ''; $('#exonChips').innerHTML = ''; $('#covGaps').innerHTML = ''; $('#covTargets').innerHTML = ''; return; }
+  const W = Math.max(820, Math.round($('.svgwrap').clientWidth) || 1200), PADX = 10, IW = W - 2 * PADX;
   const cov = coverageArrays(), reads = goodReads();
   const tg = coverageTarget(cov);
   LAYOUT = buildLayout(IW, tg.gene && R.exons[R.exons.length - 1].e - R.exons[0].s < 60000); const X = i => PADX + xOf(i);
@@ -1544,20 +1667,18 @@ function renderCoverage() {
   for (const e of R.exons) { const x = (X(e.s) + X(e.e + 1)) / 2; h += `<text class="exn" x="${x}" y="${gy - 6}" text-anchor="middle">${e.n}</text>`; }
   // variant markers
   for (const v of VARS) { const u = UCLS.get(v.key) || {}; if (u.cls === 'ART') continue; const x = X(v.s); h += `<path d="M${x - 5} ${gy - 22} L${x + 5} ${gy - 22} L${x} ${gy - 14} Z" fill="${CLS_COLOR[u.cls] || 'var(--ink)'}"><title>${esc(v.hgvs)} ${esc(v.p || '')} (${v.zyg})</title></path>`; }
-  y = gy + 30;
+  y = gy + 27;
   // depth strip: uncovered coding bases are red only inside the target
-  h += `<text x="${PADX}" y="${y + 8}">depth</text>`; y += 12;
   let runS = 0, runK = -2;
   const kindAt = i => { const t = (cov.f[i] > 0) + (cov.rv[i] > 0) * 2; if (t === 3) return 2; if (t) return 1; return tg.mask[i] ? 0 : -1; };
   const col = {0: 'var(--red)', 1: 'var(--orange)', 2: 'var(--green)'};
-  for (let i = 0; i <= R.seq.length; i++) { const k = i < R.seq.length ? kindAt(i) : -3; if (k !== runK) { if (runK >= 0) { const x1 = X(runS), x2 = X(i); h += `<rect x="${x1}" y="${y}" width="${Math.max(1, x2 - x1)}" height="8" fill="${col[runK]}"><title>${runK === 0 ? 'Target, not covered' : runK === 1 ? 'One direction only' : 'Forward + reverse'}: ${cRange(runS, i - 1)}</title></rect>`; } runS = i; runK = k; } }
-  y += 16;
+  for (let i = 0; i <= R.seq.length; i++) { const k = i < R.seq.length ? kindAt(i) : -3; if (k !== runK) { if (runK >= 0) { const x1 = X(runS), x2 = X(i); h += `<rect x="${x1}" y="${y}" width="${Math.max(1, x2 - x1)}" height="6" fill="${col[runK]}"><title>${runK === 0 ? 'Target, not covered' : runK === 1 ? 'One direction only' : 'Forward + reverse'}: ${cRange(runS, i - 1)}</title></rect>`; } runS = i; runK = k; } }
+  y += 13;
   // key positions
   const kp = keyPositions(cov).filter(k => !k.bad);
   for (const k of kp) { const x = X(k.s), c = k.f && k.rv ? 'var(--green)' : k.f || k.rv ? 'var(--orange)' : 'var(--red)'; h += `<path d="M${x} ${gy - 2} L${x} ${y - 4}" stroke="${c}" stroke-width="2" stroke-dasharray="3 2"><title>${esc(keyPosText(k))}</title></path>`; }
   // reads
   if (reads.length) {
-    h += `<text x="${PADX}" y="${y + 9}">reads (→ forward, ← reverse)</text>`; y += 13;
     const sr = reads.slice().sort((a, b) => a.res.rs - b.res.rs), L = lanes(sr.map(r => ({s: r.res.rs, e: r.res.re})));
     sr.forEach((r, k) => { const x = r.res, yy = y + L[k] * 17, x1 = X(x.rs), x2 = X(x.re + 1), c = x.rev ? 'var(--orange)' : 'var(--accent)';
       h += `<g data-read="${r.id}" style="cursor:pointer"><rect x="${x1}" y="${yy}" width="${Math.max(2, x2 - x1)}" height="12" rx="3" fill="${c}"/>`;
@@ -1566,7 +1687,7 @@ function renderCoverage() {
       h += `<text x="${x1 + 4}" y="${yy + 9.5}" style="fill:#fff;font-weight:700">${esc(r.name)} ${x.rev ? '←' : '→'}</text><title>${esc(r.name)}: ${cRange(x.rs, x.re)} · ${(x.ident * 100).toFixed(1)}% identity</title></g>`; });
     y += (Math.max(...L) + 1) * 17 + 4;
   }
-  y += 6;
+  y += 2;
   svg.setAttribute('viewBox', `0 0 ${W} ${y}`); svg.style.height = 'auto'; svg.innerHTML = h;
   // stats — measured over the target, whole CDS shown for reference
   const CD = R.coding; let n = 0, c1 = 0, c2 = 0, w1 = 0;
@@ -1575,9 +1696,9 @@ function renderCoverage() {
   for (let k = 0; k < C.length; k++) { const i = C[k], any = cov.f[i] || cov.rv[i]; if (!tg.mask[i]) continue; n++; if (any) c1++; if (cov.f[i] && cov.rv[i]) c2++; }
   const pc = (v, d) => d ? (v / d * 100).toFixed(v === d ? 0 : 1) + '%' : '—';
   R.covStat = {n, c1, c2, label: tg.label, whole: pc(w1, CD.length), unit: tg.unit, keys: keyPositions(cov).map(keyPosText)};
-  $('#covStats').innerHTML = `<div class="stat"><div class="v">${pc(c1, n)}</div><div class="l">target covered ≥1 read</div></div><div class="stat"><div class="v">${pc(c2, n)}</div><div class="l">target forward + reverse</div></div>` +
-    `<div class="stat"><div class="v">${n - c1}</div><div class="l">target bp missing</div></div>` +
-    `<div class="stat"><div class="v" style="font-size:15px;padding:3px 0">${esc(tg.label)}</div><div class="l">target · ${n} ${tg.unit} · whole CDS ${pc(w1, CD.length)}</div></div>`;
+  $('#covStats').innerHTML = `<div class="stat"><div class="v">${pc(c1, n)}</div><div class="l">covered</div></div><div class="stat"><div class="v">${pc(c2, n)}</div><div class="l">F + R</div></div>` +
+    `<div class="stat"><div class="v">${n - c1}</div><div class="l">bp missing</div></div>` +
+    `<div class="stat"><div class="v">${esc(tg.label)}</div><div class="l">target · ${n} ${tg.unit} · whole CDS ${pc(w1, CD.length)}</div></div>`;
   // exon chips
   $('#exonChips').innerHTML = R.exons.map(e => {
     let nc = 0, k1 = 0, k2 = 0; for (let i = e.s; i <= e.e; i++) if (isCoding(i)) { nc++; if (cov.f[i] || cov.rv[i]) k1++; if (cov.f[i] && cov.rv[i]) k2++; }
@@ -1653,33 +1774,84 @@ function readLabels() {
 }
 function renderVariants() {
   const tb = $('#varTable tbody'), RL = readLabels();
+  $('#varWrap').style.display = VARS.length ? '' : 'none';
   $('#varEmpty').style.display = VARS.length ? 'none' : 'block';
+  $('#varEmpty').textContent = !R ? 'No variants yet. Load a gene and add reads.' : !READS.length ? `${R.symbol} is loaded — add reads to call variants.` : 'No variant called. If a read did not align, check the Reads tab and the alerts above.';
   const nAnn = VARS.filter(v => ANN.get(v.key)?.st === 'run').length;
-  $('#varState').innerHTML = VARS.length ? `${VARS.length} variant${VARS.length > 1 ? 's' : ''}${nAnn ? ` · <span class="spin"></span> annotating ${nAnn}` : ''}` : '';
+  $('#nVars').textContent = VARS.length || '';
+  $('#varState').innerHTML = nAnn ? `<span class="spin"></span> annotating ${nAnn}` : '';
+  if (SEL && !VARS.some(v => v.key === SEL)) SEL = null;
+  const sp = '<span class="spin"></span>', dash = '<span class="muted">—</span>';
   tb.innerHTML = VARS.map(v => {
-    const a = ANN.get(v.key), u = UCLS.get(v.key) || {cls: '', note: ''};
-    const [cv, gb, gn, md] = annotCells(v);
-    const vv = vvOf(v), vvC = vv?.c, vvP = vv?.p, nv = nomVerdict(v);
-    let hg = `<div class="hg">${esc(v.hgvs)}</div>`;
-    if (vvC && vvC !== v.hgvs) hg += `<div class="vvn" title="VariantValidator normalised form">VV: ${esc(vvC)}</div>`;
-    hg += `<div class="vvn">${nv.k === 'run' ? '<span class="spin"></span> VariantValidator…' : `<span class="bdg ${{ok: 'ok', fix: 'warn', bad: 'bad', off: 'warn'}[nv.k]}" title="${esc(nv.txt)}">${{ok: '✓ VV confirmed', fix: '⚠ VV corrected', bad: '✗ VV rejected', off: 'VV not checked'}[nv.k]}</span>`}${nv.k === 'off' || nv.k === 'bad' ? ` <a href="#" data-vvretry="${esc(v.key)}">retry</a>` : ''}</div>`;
-    const gLoc = a?.g || genomicOf(v).g, gTxt = vv?.g || gLoc; if (gTxt) hg += `<div class="vvn">${esc(gTxt)}</div>`;
-    if (vv?.g && gLoc && vv.g !== gLoc) hg += `<div class="vvn" style="color:var(--orange)" title="Local genomic normalisation differs from VariantValidator: ${esc(gLoc)}">local g. differs ⓘ</div>`;
-    if (vv?.warn?.length) hg += `<div class="vvn" style="color:var(--orange)" title="${esc(vv.warn.join('\n'))}">VV warning ⓘ</div>`;
-    let prot = `<div class="pr">${esc(vvP || v.p || '—')}</div>`;
-    if (!vvP && v.p) prot += `<div class="vvn" title="Predicted locally from the transcript; VariantValidator has not confirmed it yet">local</div>`;
-    else if (vvP && v.p && normP(vvP) !== normP(v.p)) prot += `<div class="vvn" style="color:var(--orange)" title="Local prediction differs from VariantValidator">local: ${esc(v.p)}</div>`;
-    const zyg = v.zyg === 'het' ? 'Het' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Hom/Hemi' : 'Hom') : '<span class="fl r">?</span>';
-    const reads = v.sup.map(s => `<span title="${esc(s.r.name)}${s.q != null ? ' · Q' + s.q : ''}${s.ratio ? ` · secondary/primary ${(s.ratio * 100).toFixed(0)}%` : ''}">${esc(RL.get(s.r) || s.r.name)}${s.r.res.rev ? '←' : '→'}${s.ratio && s.zyg === 'het' ? ` <span class="muted">${Math.round(s.ratio * 100)}%</span>` : ''}</span>`).join('<br>');
-    return `<tr class="vr ${SEL === v.key ? 'sel' : ''}" data-key="${esc(v.key)}">
-      <td>${hg.replace('</div>', '</div>' + prot)}</td>
-      <td><div>${esc(v.loc)}</div><div class="small muted">${esc([v.type, v.effect].filter(Boolean).join(' · '))}</div><div class="zr"><b>${zyg}</b></div><div class="small">${reads}</div></td>
-      <td class="annot c-cv">${cv}</td><td class="annot c-gb">${gb}</td>
-      <td class="annot md">${gn}${gn && md ? '<div class="sep"></div>' : ''}${md}</td>
-      <td class="c-rv"><div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div>
-        <select class="cls" data-cls="${esc(v.key)}">${CLS_OPTS.map(([k, l]) => `<option value="${k}" ${u.cls === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-        <input class="note" data-note="${esc(v.key)}" value="${esc(u.note)}" placeholder="note"></td></tr>`;
+    const a = ANN.get(v.key), u = UCLS.get(v.key) || {cls: '', note: ''}, run = a?.st === 'run';
+    const vv = vvOf(v), nv = nomVerdict(v);
+    const nvIco = nv.k === 'run' ? ` ${sp}` : `<span class="nv nv-${nv.k}" title="${esc(nv.txt)}">${{ok: '✓', fix: '⚠', bad: '✗', off: '?'}[nv.k]}</span>`;
+    let cv = a?.cv?.exact ? `${cvClassChip(a.cv.exact.cls)}<span class="stars" title="${esc(a.cv.exact.review)}">${'★'.repeat(a.cv.exact.stars)}</span>` : a?.cv ? '<span class="muted">not listed</span>' : run ? sp : a ? dash : `<button class="btn sm ghost" data-ann="${esc(v.key)}">Annotate</button>`;
+    if (a?.err?.length) cv += ` <span class="fl r" title="${esc(a.err.join('\n'))}">!</span>`;
+    const af = a?.gn?.found ? `<span class="mono">${fmtAF(a.gn.af)}</span>` : a?.gn ? '<span class="muted">absent</span>' : run ? sp : dash;
+    const fl = v.flags.length ? `<span class="fl ${v.flags.some(f => f.c === 'r') ? 'r' : v.flags.every(f => f.c === 'g') ? 'g' : ''}" title="${esc(v.flags.map(f => f.t).join('\n'))}">⚠ ${v.flags.length}</span>` : '';
+    const reads = v.sup.map(s => `${esc(RL.get(s.r) || s.r.name)}${s.r.res.rev ? '←' : '→'}`).join(' ');
+    const prot = vv?.p || v.p || '';
+    return `<tr class="vr ${SEL === v.key ? 'sel' : ''} ${u.cls === 'ART' ? 'art' : ''}" data-key="${esc(v.key)}">
+      <td class="c-hg" style="box-shadow:inset 3px 0 0 ${CLS_COLOR[u.cls] || 'transparent'}" title="${esc(v.hgvs)}"><span class="hg">${esc(v.hgvs)}</span>${nvIco}</td>
+      <td class="pr" title="${esc(prot)}">${prot ? esc(prot) : dash}</td>
+      <td>${zygLabel(v)}</td>
+      <td class="c-loc" title="${esc([v.loc, v.type, v.effect].filter(Boolean).join(' · '))}">${esc(v.loc)}</td>
+      <td class="c-rd small" title="${esc(v.sup.map(s => s.r.name).join('\n'))}">${reads}</td>
+      <td class="c-cv">${cv}</td><td>${af}</td><td>${fl}</td>
+      <td>${u.cls ? `<span class="chip ${u.cls === 'ART' ? 'c-N' : 'c-' + u.cls}" title="${esc(CLS_NAME[u.cls])}">${u.cls}</span>` : dash}</td></tr>`;
   }).join('');
+  renderDetail(RL);
+}
+const zygLabel = v => v.zyg === 'het' ? 'Het' : v.zyg === 'hom' ? (R.chr === 'X' || R.chr === 'Y' ? 'Hom/Hemi' : 'Hom') : '<span class="fl r">?</span>';
+function renderDetail(RL) {
+  const box = $('#varDetail'), v = VARS.find(x => x.key === SEL);
+  if (!v) { box.dataset.key = ''; box.innerHTML = VARS.length ? '<div class="vd-hint">Select a variant to see its evidence, annotations and review fields — the alignment and traces follow.<br><span class="kbd">↑</span> <span class="kbd">↓</span> previous / next variant · <span class="kbd">←</span> <span class="kbd">→</span> step the trace one base</div>' : ''; return; }
+  const ae = document.activeElement, keep = ae && ae.dataset && ae.dataset.note === v.key ? [ae.selectionStart, ae.selectionEnd] : null;
+  const mdOpen = box.dataset.key === v.key && !!box.querySelector('details.mdd[open]'), top = box.dataset.key === v.key ? box.scrollTop : 0;
+  const a = ANN.get(v.key), u = UCLS.get(v.key) || {cls: '', note: ''};
+  const [cv, gb, gn, md] = annotCells(v);
+  const vv = vvOf(v), vvC = vv?.c, vvP = vv?.p, nv = nomVerdict(v);
+  let nom = nv.k === 'run' ? '<span class="spin"></span> checking with VariantValidator…' : `<span class="bdg ${{ok: 'ok', fix: 'warn', bad: 'bad', off: 'warn'}[nv.k]}" title="${esc(nv.txt)}">${{ok: '✓ VV confirmed', fix: '⚠ VV corrected', bad: '✗ VV rejected', off: 'VV not checked'}[nv.k]}</span>`;
+  if (nv.k === 'off' || nv.k === 'bad') nom += ` <a href="#" data-vvretry="${esc(v.key)}">retry</a>`;
+  if (vvC && vvC !== v.hgvs) nom += `<div class="vvn" title="VariantValidator normalised form">VV: ${esc(vvC)}</div>`;
+  if (vv?.warn?.length) nom += `<div class="vvn" style="color:var(--orange)" title="${esc(vv.warn.join('\n'))}">VV warning ⓘ</div>`;
+  let prot = `<span class="pr">${esc(vvP || v.p || '—')}</span>`;
+  if (!vvP && v.p) prot += ` <span class="vvn" title="Predicted locally from the transcript; VariantValidator has not confirmed it yet">local</span>`;
+  else if (vvP && v.p && normP(vvP) !== normP(v.p)) prot += `<div class="vvn" style="color:var(--orange)" title="Local prediction differs from VariantValidator">local: ${esc(v.p)}</div>`;
+  const gLoc = a?.g || genomicOf(v).g, gTxt = vv?.g || gLoc;
+  let gen = gTxt ? `<span class="vvn">${esc(gTxt)}</span>` : '<span class="muted">—</span>';
+  if (vv?.g && gLoc && vv.g !== gLoc) gen += `<div class="vvn" style="color:var(--orange)" title="Local genomic normalisation differs from VariantValidator: ${esc(gLoc)}">local g. differs ⓘ</div>`;
+  const reads = v.sup.map(s => `<div title="${esc(s.r.name)}"><span class="dir ${s.r.res.rev ? 'dirR' : 'dirF'}">${s.r.res.rev ? 'R ←' : 'F →'}</span> ${esc(RL.get(s.r) || s.r.name)}${s.q != null ? ` <span class="muted">Q${s.q}</span>` : ''}${s.ratio ? ` <span class="muted">· 2nd/1st peak ${(s.ratio * 100).toFixed(0)}%</span>` : ''}</div>`).join('') +
+    v.other.map(o => `<div title="${esc(o.r.name)}"><span class="dir dirX">ref</span> ${esc(RL.get(o.r) || o.r.name)} <span class="muted">shows the reference${o.alt != null ? ` · alt peak ${Math.round(o.alt * 100)}%` : ''}</span></div>`).join('');
+  const full = `${R.tx}:${vvC || v.hgvs}${vvP || v.p ? ' ' + (vvP || v.p) : ''}`;
+  box.dataset.key = v.key;
+  box.innerHTML = `<div class="vd-head"><span class="hg">${esc(v.hgvs)}</span><span class="pr">${esc(vvP || v.p || '')}</span><span class="tx">${esc(R.tx)}</span><span class="sp"></span><button class="btn sm ghost" data-copy="${esc(full)}" title="${esc(full)}">Copy HGVS</button></div>
+  <div class="vd-grid">
+    <div class="vd-sec"><h4>Call</h4><div class="kv">
+      <b>Nomenclature</b><span>${nom}</span>
+      <b>Protein</b><span>${prot}</span>
+      <b>Genomic</b><span>${gen}</span>
+      <b>Location</b><span>${esc(v.loc)}${v.type || v.effect ? ` <span class="muted">· ${esc([v.type, v.effect].filter(Boolean).join(' · '))}</span>` : ''}</span>
+      <b>Zygosity</b><span><b style="color:var(--ink);font-weight:700">${zygLabel(v)}</b></span>
+      <b>Reads</b><span>${reads || '—'}</span></div></div>
+    <div class="vd-sec"><h4>Review</h4>
+      ${v.flags.length ? `<div class="flagl">${v.flags.map(f => `<span class="fl ${f.c}">${esc(f.t)}</span>`).join('')}</div>` : '<span class="muted small">No flag on this call.</span>'}
+      <select class="cls" data-cls="${esc(v.key)}" aria-label="Your classification">${CLS_OPTS.map(([k, l]) => `<option value="${k}" ${u.cls === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <input class="note" data-note="${esc(v.key)}" value="${esc(u.note)}" placeholder="Note (exported to Excel)" aria-label="Note"></div>
+    ${a ? `<div class="vd-sec annot"><h4>ClinVar</h4>${cv}</div>
+    <div class="vd-sec annot"><h4>GeneBe</h4>${gb}</div>
+    <div class="vd-sec annot"><h4>gnomAD v4</h4>${gn}</div>
+    <div class="vd-sec annot"><h4>MobiDetails · scores</h4>${md}</div>` : `<div class="vd-sec wide"><h4>Annotations</h4>${cv} <span class="muted small">ClinVar · GeneBe · gnomAD · MobiDetails</span></div>`}
+  </div>`;
+  if (mdOpen) { const d = box.querySelector('details.mdd'); if (d) d.open = true; }
+  box.scrollTop = top;
+  if (keep) { const n = box.querySelector('input.note'); if (n) { n.focus(); try { n.setSelectionRange(keep[0], keep[1]); } catch (e) {} } }
+}
+function selectVariant(v) {
+  SEL = v.key; renderVariants(); scrollToIdx(v.s);
+  if (v.sup.some(s => s.r.ab) || v.other.some(o => o.r.ab)) showTraces(v.s); else $('#tracePanel').classList.remove('on');
+  const tr = $('#varTable tr.sel'); if (tr) tr.scrollIntoView({block: 'nearest'});
 }
 
 function renderFlags() {
@@ -1704,17 +1876,22 @@ function renderFlags() {
   }
   for (const v of VARS) if (v.other.length && v.zyg === 'het') out.push(['', `${v.hgvs}: heterozygous in ${v.sup.map(s => s.r.name).join(', ')} but plain reference in ${v.other.map(o => o.r.name + (o.alt != null ? ` (alt peak ${Math.round(o.alt * 100)}% of reference)` : '')).join(', ')} — check both traces.`]);
   $('#flags').innerHTML = out.map(([c, t]) => `<div class="fb ${c}">${esc(t)}</div>`).join('');
+  const nr = out.filter(o => o[0] === 'r').length, nw = out.length - nr, fb = $('#flagsBar');
+  fb.hidden = !out.length; fb.classList.toggle('r', nr > 0);
+  $('#flagsSum').innerHTML = `<b>⚠ ${[nr ? `${nr} alert${nr > 1 ? 's' : ''}` : '', nw ? `${nw} note${nw > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</b> — read before reporting`;
 }
 function renderSummary() {
   if (!R) { $('#sumBox').innerHTML = ''; return; }
   const inc = VARS.filter(v => (UCLS.get(v.key) || {}).cls !== 'ART');
   const n = c => inc.filter(v => (UCLS.get(v.key) || {}).cls === c).length;
-  $('#sumBox').innerHTML = `<div class="stat"><div class="v">${R.symbol}</div><div class="l">${esc(R.tx)}</div></div><div class="stat"><div class="v">${goodReads().length}</div><div class="l">reads aligned</div></div><div class="stat"><div class="v">${inc.length}</div><div class="l">variants to export</div></div>` + ((n('P') + n('LP')) ? `<div class="stat" style="border-color:var(--red)"><div class="v" style="color:var(--red)">${n('P') + n('LP')}</div><div class="l">P / LP (your class)</div></div>` : '');
+  const plp = n('P') + n('LP');
+  $('#sumBox').innerHTML = `<span><b>${goodReads().length}</b> reads aligned</span><span><b>${inc.length}</b> variant${inc.length === 1 ? '' : 's'} to export</span>` + (plp ? `<span class="plp"><b>${plp}</b> P / LP</span>` : '');
 }
 
 /* ---------- alignment viewer ---------- */
 let CHW = 7.5;
 function measureChar() { const s = document.createElement('span'); s.className = 'mono'; s.style.cssText = 'font-size:12.5px;position:absolute;visibility:hidden;white-space:pre'; s.textContent = 'ACGTACGTAC'.repeat(10); document.body.appendChild(s); CHW = s.getBoundingClientRect().width / 100 || 7.5; s.remove(); }
+function fitWidth() { const w = $('#aln').clientWidth - 104 - 84; return Math.max(30, Math.min(200, Math.floor(w / CHW / 10) * 10)) || 60; }
 function viewRegions() {
   const L = R.seq.length, pad = 20, mode = ST.view; let regs = [];
   if (mode === 'all') return [[0, L - 1]];
@@ -1727,12 +1904,12 @@ function viewRegions() {
 function spansFrom(chars, classes) { let h = '', cur = null, buf = ''; for (let k = 0; k <= chars.length; k++) { const c = k < chars.length ? classes[k] : '\u0000'; if (c !== cur) { if (buf) h += cur ? `<span class="${cur}">${esc(buf)}</span>` : esc(buf); buf = ''; cur = c; } if (k < chars.length) buf += chars[k]; } return h; }
 function renderAlignment() {
   const box = $('#aln');
-  if (!R) { box.innerHTML = '<div class="empty" style="margin:8px">Load a gene first.</div>'; return; }
+  if (!R) { box.innerHTML = '<div class="empty">Load a gene first.</div>'; return; }
   const reads = goodReads();
-  if (ST.view === 'reads' && !reads.length) { box.innerHTML = '<div class="empty" style="margin:8px">No aligned reads yet — switch "Show" to coding exons or whole gene to browse the reference.</div>'; return; }
-  const W = ST.width, regs = viewRegions(), seq = R.seq;
+  if (ST.view === 'reads' && !reads.length) { box.innerHTML = '<div class="empty">No aligned reads yet — switch "Show" to coding exons or whole gene to browse the reference.</div>'; return; }
+  const W = UI.width === 'auto' ? fitWidth() : UI.width, regs = viewRegions(), seq = R.seq, RL = readLabels();
   const vpos = new Set(); for (const v of VARS) for (let i = v.s; i <= Math.max(v.s, v.e); i++) vpos.add(i);
-  if (ST.view === 'all' && seq.length > 250000) { box.innerHTML = '<div class="empty" style="margin:8px">Gene too large for whole-gene view; use read-covered regions or coding exons.</div>'; return; }
+  if (ST.view === 'all' && seq.length > 250000) { box.innerHTML = '<div class="empty">Gene too large for whole-gene view; use read-covered regions or coding exons.</div>'; return; }
   const parts = []; let prevEnd = -1;
   for (const [a0, b0] of regs) {
     if (prevEnd >= 0 && a0 > prevEnd + 1) parts.push(`<div class="rgap">··· ${(a0 - prevEnd - 1).toLocaleString()} bp not shown (${cRange(prevEnd + 1, a0 - 1)}) ···</div>`);
@@ -1769,7 +1946,7 @@ function renderAlignment() {
           if (i === CUR) k += ' k-cur';
           ch.push(ST.dots && b === rf ? '.' : b); kc.push(k.trim());
         }
-        h += `<div class="ln rd${r.id}"><span class="lab" title="${esc(r.name)}">${esc(r.name)} ${x.rev ? '←' : '→'}</span><span class="sq" data-row="read" data-r="${r.id}" data-s="${s}">${spansFrom(ch, kc)}</span></div>`;
+        h += `<div class="ln rd${r.id}"><span class="lab" title="${esc(r.name)}">${esc(RL.get(r) || r.name)} ${x.rev ? '←' : '→'}</span><span class="sq" data-row="read" data-r="${r.id}" data-s="${s}">${spansFrom(ch, kc)}</span></div>`;
       }
       h += '</div>'; parts.push(h);
     }
@@ -1784,7 +1961,7 @@ function scrollToIdx(i, mark = true) {
   renderAlignment();
   let b = find();
   if (!b && ST.view !== 'all' && R.seq.length <= 250000) { ST.view = 'all'; $('#viewMode').value = 'all'; saveSettings(); renderAlignment(); b = find(); }
-  if (b) { const box = $('#aln'); box.scrollTop = b.offsetTop - box.offsetTop - 30; }
+  if (b) { const box = $('#aln'); box.scrollTop += b.getBoundingClientRect().top - box.getBoundingClientRect().top - 24; }
   setStatus(i, null);
 }
 function setStatus(i, r) {
@@ -1796,37 +1973,45 @@ function setStatus(i, r) {
 
 /* ---------- trace panel ---------- */
 const BCOL = () => { const cs = getComputedStyle(document.documentElement); return {A: cs.getPropertyValue('--bA').trim(), C: cs.getPropertyValue('--bC').trim(), G: cs.getPropertyValue('--bG').trim(), T: cs.getPropertyValue('--bT').trim()}; };
-function showTraces(i) {
+function showTraces(i, quiet) {
   const p = $('#tracePanel');
   const rs = goodReads().filter(r => r.ab && readCovers(r, i) && r.res.rawAt[i - r.res.rs] >= 0);
-  if (!rs.length) { p.classList.remove('on'); toast('No AB1 trace covers this position'); return; }
+  if (!rs.length && !quiet) { p.classList.remove('on'); toast('No AB1 trace covers this position'); return; }
+  const top = p.classList.contains('on') && $('.trbody', p) ? $('.trbody', p).scrollTop : 0;
   p.classList.add('on');
-  p.innerHTML = `<div class="row" style="justify-content:space-between"><b>Traces at c.${esc(cLabel(i))} (ref ${R.seq[i]}) — shown in gene orientation</b><button class="btn sm ghost" id="trClose">Close</button></div>` +
-    rs.map(r => `<div class="tr"><div class="h"><span>${esc(r.name)} ${r.res.rev ? '← (reverse read, complemented)' : '→'}</span><span class="muted" id="trInfo${r.id}"></span></div><canvas id="trc${r.id}"></canvas></div>`).join('');
-  $('#trClose').onclick = () => p.classList.remove('on');
+  p.innerHTML = `<div class="trhead"><h2>Traces</h2><span class="pos">c.${esc(cLabel(i))}</span><span class="muted small">ref ${R.seq[i]} · ${esc(region(i).txt)} · gene orientation</span>
+    <span class="trleg">${'ACGT'.split('').map(b => `<span style="color:var(--b${b})">${b}</span>`).join('')}</span><span class="sp"></span>
+    <label class="fld">Window <select id="trWin" class="inp" style="height:22px">${[10, 20, 30].map(n => `<option value="${n}" ${UI.trw === n ? 'selected' : ''}>± ${n} bases</option>`).join('')}</select></label>
+    <button class="btn sm ghost" data-step="-1" title="Previous base (←)">◀</button><button class="btn sm ghost" data-step="1" title="Next base (→)">▶</button><button class="btn sm ghost" id="trClose" title="Close (Esc)">✕</button></div>
+    <div class="trbody">` + (rs.length ? rs.map(r => `<div class="tr"><div class="h"><span class="dir ${r.res.rev ? 'dirR' : 'dirF'}" title="${r.res.rev ? 'Reverse read, shown complemented' : 'Forward read'}">${r.res.rev ? 'R ←' : 'F →'}</span><span class="nm">${esc(r.name)}</span><span class="inf muted" id="trInfo${r.id}"></span></div><canvas id="trc${r.id}"></canvas></div>`).join('') : '<div class="empty">No AB1 trace covers this position.</div>') + '</div>';
+  $('.trbody', p).scrollTop = top;
   requestAnimationFrame(() => rs.forEach(r => drawTrace(r, i)));
 }
+function stepBase(d) { if (!R || CUR < 0) return; const i = Math.min(R.seq.length - 1, Math.max(0, CUR + d)); scrollToIdx(i); showTraces(i, true); }
 function drawTrace(r, i) {
   const cv = $('#trc' + r.id); if (!cv) return;
-  const x = r.res, ab = r.ab, raw = x.rawAt[i - x.rs], rev = x.rev, dpr = window.devicePixelRatio || 1;
+  const x = r.res, ab = r.ab, raw = x.rawAt[i - x.rs], rev = x.rev, dpr = window.devicePixelRatio || 1, half = UI.trw || 10;
   const Wc = cv.clientWidth, Hc = cv.clientHeight; cv.width = Wc * dpr; cv.height = Hc * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
-  const nb = ab.base.length, b0 = Math.max(0, raw - 10), b1 = Math.min(nb - 1, raw + 10);
+  const nb = ab.base.length, b0 = Math.max(0, raw - half), b1 = Math.min(nb - 1, raw + half);
   const s0 = Math.max(0, ab.ploc[b0] - 8), s1 = Math.min(ab.scans - 1, ab.ploc[b1] + 8);
   let mx = 1; for (const b of 'ACGT') for (let s = s0; s <= s1; s++) mx = Math.max(mx, ab.tr[b][s]);
-  const top = 6, bot = Hc - 34, X = s => rev ? (s1 - s) / (s1 - s0) * Wc : (s - s0) / (s1 - s0) * Wc, Y = v => bot - v / mx * (bot - top);
+  const top = 6, bot = Hc - 32, X = s => rev ? (s1 - s) / (s1 - s0) * Wc : (s - s0) / (s1 - s0) * Wc, Y = v => bot - v / mx * (bot - top);
   const col = BCOL(), cs = getComputedStyle(document.documentElement);
-  // highlight
-  g.fillStyle = cs.getPropertyValue('--accent-soft'); const cx = X(ab.ploc[raw]); g.fillRect(cx - 7, 0, 14, Hc);
+  // highlight the selected base, baseline
+  const hw = Math.max(4, Math.min(9, Wc / (b1 - b0 + 2) / 2));
+  g.fillStyle = cs.getPropertyValue('--accent-soft'); const cx = X(ab.ploc[raw]); g.fillRect(cx - hw, 0, hw * 2, Hc);
+  g.strokeStyle = cs.getPropertyValue('--line'); g.lineWidth = 1; g.beginPath(); g.moveTo(0, bot + .5); g.lineTo(Wc, bot + .5); g.stroke();
   for (const b of 'ACGT') { const shown = rev ? COMP[b] : b; g.strokeStyle = col[shown]; g.lineWidth = 1.4; g.beginPath(); for (let s = s0; s <= s1; s++) { const px = X(s), py = Y(Math.max(0, ab.tr[b][s])); s === s0 ? g.moveTo(px, py) : g.lineTo(px, py); } g.stroke(); }
-  g.font = '700 12px JetBrains Mono, monospace'; g.textAlign = 'center';
+  const fs = half > 20 ? 9 : half > 10 ? 10.5 : 12, bw = half > 20 ? 2 : 3;
+  g.font = `700 ${fs}px JetBrains Mono, monospace`; g.textAlign = 'center';
   for (let j = b0; j <= b1; j++) {
     const px = X(ab.ploc[j]); let b = x.calls[j]; if (rev) b = COMP[b] || 'N';
-    g.fillStyle = isAmb(b) ? cs.getPropertyValue('--orange') : (col[b] || cs.getPropertyValue('--muted')); g.fillText(b, px, Hc - 18);
-    if (ab.qual) { const q = ab.qual[j]; g.fillStyle = cs.getPropertyValue('--line'); g.fillRect(px - 3, Hc - 12, 6, 10); g.fillStyle = q >= 30 ? cs.getPropertyValue('--green') : q >= 20 ? cs.getPropertyValue('--orange') : cs.getPropertyValue('--red'); g.fillRect(px - 3, Hc - 2 - Math.min(10, q / 6), 6, Math.min(10, q / 6)); }
+    g.fillStyle = isAmb(b) ? cs.getPropertyValue('--orange') : (col[b] || cs.getPropertyValue('--muted')); g.fillText(b, px, Hc - 17);
+    if (ab.qual) { const q = ab.qual[j]; g.fillStyle = cs.getPropertyValue('--line'); g.fillRect(px - bw, Hc - 12, bw * 2, 10); g.fillStyle = q >= 30 ? cs.getPropertyValue('--green') : q >= 20 ? cs.getPropertyValue('--orange') : cs.getPropertyValue('--red'); g.fillRect(px - bw, Hc - 2 - Math.min(10, q / 6), bw * 2, Math.min(10, q / 6)); }
   }
   const h = {}; for (const b of 'ACGT') h[rev ? COMP[b] : b] = peakH(ab, raw, b);
   const srt = Object.entries(h).sort((a, b) => b[1] - a[1]);
-  $('#trInfo' + r.id).textContent = `peaks ${srt.map(([b, v]) => `${b} ${v}`).join(' · ')} · secondary/primary ${srt[0][1] ? Math.round(srt[1][1] / srt[0][1] * 100) : 0}%${ab.qual ? ` · Q${ab.qual[raw]}` : ''} · call ${rev ? COMP[x.calls[raw]] : x.calls[raw]}`;
+  $('#trInfo' + r.id).textContent = `call ${rev ? COMP[x.calls[raw]] : x.calls[raw]}${ab.qual ? ` · Q${ab.qual[raw]}` : ''} · 2nd/1st peak ${srt[0][1] ? Math.round(srt[1][1] / srt[0][1] * 100) : 0}% · ${srt.map(([b, v]) => `${b} ${v}`).join(' ')}`;
 }
 
 /* ---------- reference panel ---------- */
@@ -1948,6 +2133,7 @@ async function handleFiles(files) {
   if (n) { if (!R) toast('Reads loaded — now load a gene'); refresh(); }
 }
 function readById(id) { return READS.find(r => r.id === +id); }
+function setTab(name) { for (const b of document.querySelectorAll('.ptab')) b.classList.toggle('on', b.dataset.ptab === name); for (const p of document.querySelectorAll('.tabpane')) p.classList.toggle('on', p.dataset.pane === name); }
 
 function bind() {
   measureChar(); if (document.fonts) document.fonts.ready.then(measureChar);
@@ -1955,10 +2141,10 @@ function bind() {
   $('#geneInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadGene(e.target.value); });
   $('#txSelect').onchange = e => loadTranscript(+e.target.value).catch(err => toast(err.message, 5000));
   const drop = $('#drop'), fi = $('#fileInput');
-  drop.onclick = () => fi.click();
+  drop.onclick = () => fi.click(); $('#addReads').onclick = () => fi.click();
   fi.onchange = () => { handleFiles([...fi.files]); fi.value = ''; };
-  ['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || e.target === document.documentElement) drop.classList.remove('over'); }));
+  ['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); if ([...(e.dataTransfer?.types || [])].includes('Files')) document.body.classList.add('dragging'); }));
+  ['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || e.target === document.documentElement || !e.relatedTarget) { drop.classList.remove('over'); document.body.classList.remove('dragging'); } }));
   document.addEventListener('drop', e => { drop.classList.remove('over'); if (e.dataTransfer?.files?.length) handleFiles([...e.dataTransfer.files]); });
   $('#pasteAdd').onclick = () => {
     const txt = $('#pasteBox').value.trim(); if (!txt) return;
@@ -1978,16 +2164,17 @@ function bind() {
   $('#exportBtn').onclick = exportXlsx;
   $('#clearBtn').onclick = () => { if (READS.length && !confirm('Remove all reads, variants and classifications for this patient?')) return; READS.length = 0; UCLS.clear(); SEL = null; CUR = -1; $('#patient').value = ''; $('#sample').value = ''; $('#tracePanel').classList.remove('on'); refresh(); };
   // variant table
-  const vt = $('#varTable');
+  const vt = $('#tabVars');
   vt.addEventListener('click', e => {
     const ann = e.target.closest('[data-ann]'); if (ann) { e.stopPropagation(); annotate(ann.dataset.ann); return; }
     const vr = e.target.closest('[data-vvretry]'); if (vr) { e.preventDefault(); e.stopPropagation(); checkNomenclature(vr.dataset.vvretry); refreshVars(); return; }
     const rt = e.target.closest('[data-retry]'); if (rt) { e.preventDefault(); e.stopPropagation(); annotate(rt.dataset.retry, true); return; }
+    const cp = e.target.closest('[data-copy]'); if (cp) { copyText(cp.dataset.copy, 'HGVS copied'); return; }
     if (e.target.closest('select,input,a,details')) return;
     const tr = e.target.closest('tr.vr'); if (!tr) return; const v = VARS.find(x => x.key === tr.dataset.key); if (!v) return;
-    SEL = v.key; renderVariants(); scrollToIdx(v.s); if (v.sup.some(s => s.r.ab) || v.other.some(o => o.r.ab)) showTraces(v.s);
+    selectVariant(v);
   });
-  vt.addEventListener('change', e => { const s = e.target.closest('[data-cls]'); if (s) { const u = UCLS.get(s.dataset.cls) || {cls: '', note: ''}; u.cls = s.value; UCLS.set(s.dataset.cls, u); renderCoverage(); renderSummary(); } });
+  vt.addEventListener('change', e => { const s = e.target.closest('[data-cls]'); if (s) { const u = UCLS.get(s.dataset.cls) || {cls: '', note: ''}; u.cls = s.value; UCLS.set(s.dataset.cls, u); renderCoverage(); renderSummary(); renderVariants(); } });
   vt.addEventListener('input', e => { const s = e.target.closest('[data-note]'); if (s) { const u = UCLS.get(s.dataset.note) || {cls: '', note: ''}; u.note = s.value; UCLS.set(s.dataset.note, u); } });
   // coverage map
   $('#covSvg').addEventListener('click', e => {
@@ -2002,21 +2189,21 @@ function bind() {
   $('#covTargets').onclick = e => { const t = e.target.closest('[data-kp]'); if (!t) return; const i = +t.dataset.kp; scrollToIdx(i); if (goodReads().some(x => x.ab && readCovers(x, i))) showTraces(i); };
   // theme
   const THEMES = ['auto', 'light', 'dark'];
-  const applyTheme = t => { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('#themeBtn').textContent = 'Theme: ' + t; if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); };
+  const applyTheme = t => { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('#themeBtn').textContent = {auto: 'Auto', light: 'Light', dark: 'Dark'}[t]; $('#themeBtn').title = `Theme: ${t} — click to switch`; if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); };
   applyTheme(THEMES.includes(recall('ssv-theme')) ? recall('ssv-theme') : 'auto');
   $('#themeBtn').onclick = () => { const t = THEMES[(THEMES.indexOf(recall('ssv-theme') || 'auto') + 1) % 3]; store('ssv-theme', t); applyTheme(t); };
   $('#exonChips').onclick = e => { const c = e.target.closest('[data-idx]'); if (c) { let i = +c.dataset.idx; while (!isCoding(i) && i < R.seq.length - 1 && R.mpos[i]) i++; scrollToIdx(i, false); } };
   // alignment
-  $('#viewMode').value = ST.view; $('#blockW').value = String(ST.width); $('#dotsChk').checked = ST.dots;
+  $('#viewMode').value = ST.view; $('#blockW').value = String(UI.width); $('#dotsChk').checked = ST.dots;
   $('#viewMode').onchange = e => { ST.view = e.target.value; saveSettings(); renderAlignment(); };
-  $('#blockW').onchange = e => { ST.width = +e.target.value; saveSettings(); renderAlignment(); };
+  $('#blockW').onchange = e => { UI.width = e.target.value === 'auto' ? 'auto' : +e.target.value; saveUI(); renderAlignment(); };
   $('#dotsChk').onchange = e => { ST.dots = e.target.checked; saveSettings(); renderAlignment(); };
   const jump = () => { if (!R) return; const i = cToIndex($('#jumpInput').value); if (i == null) return toast('Unrecognised c. position'); scrollToIdx(i); };
   $('#jumpBtn').onclick = jump; $('#jumpInput').addEventListener('keydown', e => { if (e.key === 'Enter') jump(); });
   const aln = $('#aln');
   const idxAt = (sq, e) => { const rect = sq.getBoundingClientRect(); const k = Math.floor((e.clientX - rect.left) / CHW); return +sq.dataset.s + Math.max(0, k); };
   aln.addEventListener('mousemove', e => { const sq = e.target.closest('.sq'); if (!sq || !R) return; const i = idxAt(sq, e), blk = sq.closest('.blk'); if (i > +blk.dataset.e) return; setStatus(i, sq.dataset.r ? readById(sq.dataset.r) : null); });
-  aln.addEventListener('click', e => { if (String(window.getSelection())) return; const sq = e.target.closest('.sq'); if (!sq || !R) return; const i = idxAt(sq, e); if (i > +sq.closest('.blk').dataset.e) return; CUR = i; renderAlignment(); const r = sq.dataset.r ? readById(sq.dataset.r) : null; setStatus(i, r); if (goodReads().some(x => x.ab && readCovers(x, i))) showTraces(i); });
+  aln.addEventListener('click', e => { if (String(window.getSelection())) return; const sq = e.target.closest('.sq'); if (!sq || !R) return; const i = idxAt(sq, e); if (i > +sq.closest('.blk').dataset.e) return; CUR = i; renderAlignment(); const r = sq.dataset.r ? readById(sq.dataset.r) : null; setStatus(i, r); if (goodReads().some(x => x.ab && readCovers(x, i))) showTraces(i); requestAnimationFrame(() => { const b = [...aln.querySelectorAll('.blk')].find(b => +b.dataset.s <= i && +b.dataset.e >= i); if (b) b.scrollIntoView({block: 'nearest'}); }); });
   // reference panel
   $('#refTabs').onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { REFTAB = t.dataset.tab; renderRef(); } };
   $('#refCopy').onclick = () => R && copyText(refText(REFTAB), 'Sequence copied');
@@ -2035,7 +2222,34 @@ function bind() {
   ['sGbUser', 'sGbKey', 'sGbRelay'].forEach(id => $('#' + id).addEventListener('change', () => { ST.gbUser = $('#sGbUser').value.trim(); ST.gbKey = $('#sGbKey').value.trim(); ST.gbRelay = $('#sGbRelay').value.trim(); saveSettings(); }));
   $('#sClearCache').onclick = () => { let n = 0; try { for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if (/^ssv-(ann\d|vv|prod)-/.test(key)) { localStorage.removeItem(key); n++; } } } catch (e) {} toast(`Cleared ${n} cached entries`); };
   window.addEventListener('beforeunload', e => { if (READS.length) { e.preventDefault(); e.returnValue = ''; } });
-  window.addEventListener('resize', () => { if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR); });
+  // layout: tabs, splitter, collapsible coverage, popovers, keyboard
+  const relayout = () => { if (R) renderCoverage(); if (R && UI.width === 'auto') { if (CUR >= 0) scrollToIdx(CUR, false); else renderAlignment(); } if ($('#tracePanel').classList.contains('on') && CUR >= 0) showTraces(CUR, true); };
+  let rzT = 0; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(relayout, 120); });
+  $('.ptabs').addEventListener('click', e => { const t = e.target.closest('[data-ptab]'); if (t) setTab(t.dataset.ptab); });
+  const work = $('#work'), split = $('#split');
+  const setSplit = f => { UI.split = Math.min(0.72, Math.max(0.26, f)); work.style.setProperty('--split', (UI.split * 100).toFixed(2) + '%'); };
+  setSplit(UI.split);
+  split.addEventListener('pointerdown', e => { split.setPointerCapture(e.pointerId); split.classList.add('drag'); e.preventDefault(); });
+  split.addEventListener('pointermove', e => { if (!split.classList.contains('drag')) return; const b = work.getBoundingClientRect(); setSplit((e.clientX - b.left) / b.width); });
+  const endDrag = () => { if (!split.classList.contains('drag')) return; split.classList.remove('drag'); saveUI(); relayout(); };
+  split.addEventListener('pointerup', endDrag); split.addEventListener('pointercancel', endDrag);
+  split.addEventListener('dblclick', () => { setSplit(0.46); saveUI(); relayout(); });
+  const setCov = open => { UI.cov = open; $('#covPanel').classList.toggle('shut', !open); $('#covToggle').setAttribute('aria-expanded', open); if (open && R) renderCoverage(); };
+  setCov(UI.cov !== false);
+  $('#covToggle').onclick = () => { setCov(!UI.cov); saveUI(); };
+  const closePops = () => { let n = 0; for (const x of document.querySelectorAll('.pop')) { if (!x.hidden) n++; x.hidden = true; } return n; };
+  document.addEventListener('click', e => { const b = e.target.closest('[data-pop]'); if (b) { const x = $('#' + b.dataset.pop), was = x.hidden; closePops(); x.hidden = !was; return; } if (!e.target.closest('.pop')) closePops(); });
+  $('#aboutBtn').onclick = () => $('#aboutDlg').showModal(); $('#aboutClose').onclick = () => $('#aboutDlg').close();
+  const tp = $('#tracePanel');
+  tp.addEventListener('click', e => { if (e.target.closest('#trClose')) return tp.classList.remove('on'); const s = e.target.closest('[data-step]'); if (s) stepBase(+s.dataset.step); });
+  tp.addEventListener('change', e => { if (e.target.id === 'trWin') { UI.trw = +e.target.value; saveUI(); if (CUR >= 0) showTraces(CUR, true); } });
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input,select,textarea,dialog,summary')) return;
+    if (e.key === 'Escape') { if (!closePops()) tp.classList.remove('on'); return; }
+    const dv = e.key === 'ArrowDown' || e.key === 'j' ? 1 : e.key === 'ArrowUp' || e.key === 'k' ? -1 : 0;
+    if (dv && VARS.length && $('#tabVars').classList.contains('on')) { const k = VARS.findIndex(v => v.key === SEL), n = k < 0 ? (dv > 0 ? 0 : VARS.length - 1) : Math.min(VARS.length - 1, Math.max(0, k + dv)); if (n !== k) selectVariant(VARS[n]); e.preventDefault(); return; }
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && tp.classList.contains('on') && CUR >= 0) { stepBase(e.key === 'ArrowLeft' ? -1 : 1); e.preventDefault(); }
+  });
   renderRef(); renderCoverage();
 }
 bind();
