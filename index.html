@@ -176,8 +176,8 @@ table{border-collapse:collapse;width:100%}
 .tbl td.c-hg{max-width:190px;padding-left:10px}
 .tbl td.c-cv{max-width:160px}
 .tbl th:first-child{padding-left:10px}
-@container (max-width:730px){.c-rd{display:none}}
-@container (max-width:630px){.c-loc{display:none}}
+@container (max-width:860px){.c-rd{display:none}}
+@container (max-width:760px){.c-loc{display:none}}
 .hg{font-family:var(--mono);font-weight:700;font-size:12px}
 .pr{font-family:var(--mono);font-size:12px}
 .nv{font-weight:700;margin-left:5px;font-size:11px}
@@ -369,7 +369,7 @@ dialog p{margin:0 0 10px;font-size:12.5px}
     <details class="flagsbar" id="flagsBar" open hidden><summary id="flagsSum"></summary><div id="flags" class="flagsbox"></div></details>
 
     <div class="tabpane" data-pane="vars" id="tabVars">
-      <div class="tbl" id="varWrap" style="display:none"><table id="varTable"><thead><tr><th>Variant</th><th>Protein</th><th>Zyg</th><th class="c-loc">Location</th><th class="c-rd">Reads</th><th>ClinVar</th><th>gnomAD</th><th>Flags</th><th>Class</th></tr></thead><tbody></tbody></table></div>
+      <div class="tbl" id="varWrap" style="display:none"><table id="varTable"><thead><tr><th>Variant</th><th>Protein</th><th>Zyg</th><th class="c-loc">Location</th><th class="c-rd">Reads</th><th>ClinVar</th><th>GeneBe</th><th>gnomAD</th><th>Flags</th><th>Class</th></tr></thead><tbody></tbody></table></div>
       <div id="varEmpty" class="empty">No variants yet. Load a gene and add reads.</div>
       <div id="varDetail" class="vdetail"></div>
     </div>
@@ -1788,6 +1788,9 @@ function renderVariants() {
     const nvIco = nv.k === 'run' ? ` ${sp}` : `<span class="nv nv-${nv.k}" title="${esc(nv.txt)}">${{ok: '✓', fix: '⚠', bad: '✗', off: '?'}[nv.k]}</span>`;
     let cv = a?.cv?.exact ? `${cvClassChip(a.cv.exact.cls)}<span class="stars" title="${esc(a.cv.exact.review)}">${'★'.repeat(a.cv.exact.stars)}</span>` : a?.cv ? '<span class="muted">not listed</span>' : run ? sp : a ? dash : `<button class="btn sm ghost" data-ann="${esc(v.key)}">Annotate</button>`;
     if (a?.err?.length) cv += ` <span class="fl r" title="${esc(a.err.join('\n'))}">!</span>`;
+    const g = a?.gb, gbc = g && !g.failed ? (g.acmg || g.comb) : null;
+    const gbt = g ? (g.failed ? `GeneBe not loaded${g.why ? ' (' + g.why + ')' : ''} — see the detail panel` : [g.acmg ? `GeneBe automatic ACMG: ${g.acmg}${g.score != null ? ` (${g.score} pts)` : ''}${g.crit ? ' · ' + g.crit.replace(/,/g, ', ') : ''}` : '', g.comb ? `Submitted classification: ${g.comb}` : ''].filter(Boolean).join('\n')) : '';
+    const gb = gbc ? `<span title="${esc(gbt)}">${cvClassChip(gbc)}${g.acmg && g.score != null ? `<span class="muted small"> ${g.score > 0 ? '+' : ''}${g.score}</span>` : ''}</span>` : g ? `<span class="muted" title="${esc(gbt)}">${g.failed ? 'not loaded' : 'no class'}</span>` : run ? sp : dash;
     const af = a?.gn?.found ? `<span class="mono">${fmtAF(a.gn.af)}</span>` : a?.gn ? '<span class="muted">absent</span>' : run ? sp : dash;
     const fl = v.flags.length ? `<span class="fl ${v.flags.some(f => f.c === 'r') ? 'r' : v.flags.every(f => f.c === 'g') ? 'g' : ''}" title="${esc(v.flags.map(f => f.t).join('\n'))}">⚠ ${v.flags.length}</span>` : '';
     const reads = v.sup.map(s => `${esc(RL.get(s.r) || s.r.name)}${s.r.res.rev ? '←' : '→'}`).join(' ');
@@ -1798,7 +1801,7 @@ function renderVariants() {
       <td>${zygLabel(v)}</td>
       <td class="c-loc" title="${esc([v.loc, v.type, v.effect].filter(Boolean).join(' · '))}">${esc(v.loc)}</td>
       <td class="c-rd small" title="${esc(v.sup.map(s => s.r.name).join('\n'))}">${reads}</td>
-      <td class="c-cv">${cv}</td><td>${af}</td><td>${fl}</td>
+      <td class="c-cv">${cv}</td><td class="c-cv">${gb}</td><td>${af}</td><td>${fl}</td>
       <td>${u.cls ? `<span class="chip ${u.cls === 'ART' ? 'c-N' : 'c-' + u.cls}" title="${esc(CLS_NAME[u.cls])}">${u.cls}</span>` : dash}</td></tr>`;
   }).join('');
   renderDetail(RL);
